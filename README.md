@@ -1,0 +1,101 @@
+> 
+>        ...    .     ...                        ..                                       
+>     .~`'888x.!**h.-``888h.               x .d88'     oec :                              
+>    dX   `8888   :X   48888>         u.    5888R     @88888                u.    u.      
+>   '888x  8888  X88.  '8888>   ...ue888b   '888R     8'*88%       .u     x@88k u@88c.    
+>   '88888 8888X:8888:   )?''`  888R Y888r   888R     8b.       ud8888.  ^'8888''8888'^   
+>    `8888>8888 '88888>.88h.    888R I888>   888R    u888888> :888'8888.   8888  888R     
+>      `8' 888f  `8888>X88888.  888R I888>   888R     8888R   d888 '88%'   8888  888R     
+>     -~` '8%'     88' `88888X  888R I888>   888R     8888P   8888.+'      8888  888R     
+>     .H888n.      XHn.  `*88! u8888cJ888    888R     *888>   8888L        8888  888R     
+>    :88888888x..x88888X.  `!   '*888*P'    .888B .   4888    '8888c. .+  '*88*' 8888'    
+>    f  ^%888888% `*88888nx'      'Y'       ^*888%    '888     '88888%      ''   'Y'      
+>         `'**'`    `'**''                    '%       88R       'YP'                     
+>                                                      88>                                
+>                                                      48                                 
+>                                                      '8                                 
+>     .....                                       s                          ....         
+>  .H8888888h.  ~-.                              :8      .x~~'*Weu.      .xH888888Hx.     
+>  888888888888x  `>               uL   ..      .88     d8Nu.  9888c   .H8888888888888:   
+> X~     `?888888hx~      .u     .@88b  @88R   :888ooo  88888  98888   888*'''?''*88888X  
+> '      x8.^'*88*'    ud8888.  ''Y888k/'*P  -*8888888  '***'  9888%  'f     d8x.   ^%88k 
+>  `-:- X8888x       :888'8888.    Y888L       8888          ..@8*'   '>    <88888X   '?8 
+>       488888>      d888 '88%'     8888       8888       ````'8Weu    `:..:`888888>    8>
+>     .. `'88*       8888.+'        `888N      8888      ..    ?8888L         `'*88     X 
+>   x88888nX'      . 8888L       .u./'888&    .8888Lu= :@88N   '8888N    .xHHhx..'      ! 
+>  !'*8888888n..  :  '8888c. .+ d888' Y888*'  ^%888*   *8888~  '8888F   X88888888hx. ..!  
+> '    '*88888888*    '88888%   ` 'Y   Y'       'Y'    '*8'`   9888%   !   '*888888888'   
+>         ^'***'`       'YP'                             `~===*%'`            ^'***'`     
+> 
+
+"Inspired by the classic, but now for your terminal window!"
+
+Wolfentext3D is a simple take on a classic game with the following goals:
+
+* Lean and mean: all code should be contained in a single source file.
+* No external dependencies, other than the Ruby core and standard libraries.
+* No bitmap graphics: everything uses ASCII art and terminal colors!
+
+Wolfentext3D is proudly (if not somewhat arbitrarily) written in pure Ruby.  Where possible, code documentation is provided in YARD format.
+
+Features
+========
+
+Here are the items and features currently supported in Wolfentext:
+
+* Solid orthogonal walls
+* Floor colors and "textures"
+* Ceiling colors and "textures"
+* Collision detection with wall sliding
+* Title, help, and debug screens
+
+...and here are some items presently **missing** that may be added later:
+
+* Wall textures
+* Sliding doors
+* Secret walls
+* Stationary and usable objects
+* Enemies and other entities
+* Sounds or music
+
+Requirements
+============
+
+The only requirement for Wolfentext is a local installation of Ruby 2.0.0+.
+
+Wolfentext should also work on all recent versions of OS X, Linux, and Windows.  *(That said, Windows users may notice some issues when running Wolfentext on their machines.  See the notes below for more information.)*
+
+Installation
+============
+
+To install Wolfentext, simply download the `wolfentext.rb` file or clone the repo to your local machine:
+
+```
+$ git clone http://github.com/AtomicPair/wolfentext3d.git
+```
+
+Usage
+=====
+
+```
+$ cd wolfentext
+$ ruby wolfentext.rb
+```
+
+Notes
+=====
+
+Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some known issues with the game of which you should be aware:
+
+* *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release.
+* *Gameplay*: Right now, Wolfentext only runs when a key is pressed.  This will change in the future once support for enemies and other dynamic objects are added.
+* *Timing*: Currently, there are no delta time calculations applied to the screen updates, player movements, or world events.  This could cause events to occur slower or faster than expected, depending on the speed of your machine and terminal.
+* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a fairly crude, single-buffered graphical updating system. Migrating to Ruby's built-in support for the well-known curses library would greatly improve this situation on *nix systems, but doing so might pose an external dependency problem for Windows users.
+* *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further optimizations in the area of the graphics subsystem (mentioned above), (2) further refinement to the ray casting lookup tables, and (3) better memory profiling to identify and reduce overall resource allocations.
+
+Any thoughts or suggestions (up to and including pull requests) for solving some of these problems are always welcome!
+
+Support
+=======
+
+If you have any problems or suggestions, please file an issue in the official [GitHub repository](http://github.com/AtomicPair/wolfentext3d/).
