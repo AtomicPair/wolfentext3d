@@ -30,7 +30,7 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 # Handles all keyboard input for the application.
 #
@@ -162,8 +162,13 @@ class Game
 
   # Clears the current screen.
   #
-  def clear_screen
-    system "clear" or system "cls"
+  def clear_screen( full = false )
+    if full
+      puts "\e[#{ @clear_rows }A"
+      puts "\n".rjust( 100 ) * @clear_rows
+    end
+
+    puts "\e[#{ @clear_rows }A"
   end
 
   # Colorizes a given piece of text for display in the terminal.
@@ -194,9 +199,9 @@ class Game
     @status_y = @player_y.to_s.rjust( 3 )
     @status_angle = ( ( @player_angle / @fixed_step ).round ).to_s.rjust( 3 )
 
+    @status_left = "(Press H for help)".ljust( 18 )
     @status_middle = @hud_messages[ @play_counter % 3 ].center( 44 )
     @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 18 )
-    @status_left = "(Press H for help)".ljust( 18 )
 
     puts @status_left + @status_middle + @status_right
   end
@@ -563,6 +568,8 @@ class Game
     @fixed_count = ( 360 * @screen_width ) / @player_fov
     @fixed_step = @fixed_count / 360.0
 
+    @clear_rows = 80
+
     @color_mode = COLOR_NONE
     @draw_ceiling = true
     @draw_floor = false
@@ -585,7 +592,7 @@ class Game
   # press a key before returning control back to the caller.
   #
   def show_debug_info
-    clear_screen
+    clear_screen true
 
     puts
     puts "Super Awesome Debug Console(TM)".center( @screen_width )
@@ -616,6 +623,8 @@ class Game
     puts
 
     Input.get_key
+
+    clear_screen true
   end
 
   # Shows the ending screen.
@@ -628,12 +637,12 @@ class Game
         @buffer[ i ] = "" if i % j == 0
       end
 
-      clear_screen
+      clear_screen true
       draw_buffer
       sleep 0.25
     end
 
-    clear_screen
+    clear_screen true
 
     puts "\n" * ( ( @screen_height / 2 ) - 7 )
     puts "You have reached...".center( 72 )
@@ -650,20 +659,20 @@ class Game
     puts
     puts "Press any key to find out!".center( 72 )
     puts "\n" * ( ( @screen_height / 2 ) - 7 )
-                                                                      
+
     Input.get_key
 
     @play_counter += 1
 
     reset_player
-    clear_screen
+    clear_screen true
     update_buffer
   end
 
   # Displays the exit screen and quits the application.
   #
   def show_exit_screen
-    clear_screen
+    clear_screen true
 
     puts
     puts "Thanks for playing...".center( @screen_width )
@@ -682,7 +691,7 @@ class Game
   # press a key before returning control back to the caller.
   #
   def show_help_screen
-    clear_screen
+    clear_screen true
 
     puts
     puts "Wolfentext3D Help".center( @screen_width )
@@ -729,12 +738,14 @@ class Game
     puts
 
     Input.get_key
+
+    clear_screen true
   end
 
   # Displays the application's title screen.
   #
   def show_title_screen
-    clear_screen
+    clear_screen true
 
     puts
     show_logo
@@ -743,6 +754,8 @@ class Game
     puts "Press any key to start...".center( 88 )
 
     Input.get_key
+
+    clear_screen true
   end
 
   # Displays the Wolfentext logo.

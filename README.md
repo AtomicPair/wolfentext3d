@@ -86,7 +86,7 @@ Notes
 
 Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some known issues with the game of which you should be aware:
 
-* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a fairly crude, single-buffered graphical updating system. Migrating to Ruby's built-in support for the well-known curses library would greatly improve this situation on *nix systems, but doing so might pose an external dependency problem for Windows users.
+* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all playforms, achieving framerates up to 60 fps.  However, Windows users may notice **significant** performance issues when using *any* color mode in the native Comand Prompt or Powershell terminals.  Other third-party terminals may yield better performance but have not yet been tested.
 * *Gameplay*: Right now, Wolfentext only runs when a key is pressed.  This will change in the future once support for enemies and other dynamic objects are added.
 * *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release.
 * *Timing*: Currently, there are no delta time calculations applied to the screen updates, player movements, or world events.  This could cause events to occur slower or faster than expected, depending on the speed of your machine and terminal.
