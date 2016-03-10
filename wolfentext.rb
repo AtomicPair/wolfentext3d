@@ -115,6 +115,7 @@ class Game
   include Math
 
   CELL_MARGIN = 32
+  MAP_EMPTY_CELL = "."
 
   def initialize
     setup_variables
@@ -146,7 +147,7 @@ class Game
     if @move_x > 0
       # Moving right
       #
-      unless @map[ @y_cell ][ @x_cell + 1 ] == "0"
+      unless @map[ @y_cell ][ @x_cell + 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell + 1 ] == "E"
           show_end_screen
         elsif @x_sub_cell > ( @grid_width - CELL_MARGIN )
@@ -156,7 +157,7 @@ class Game
     else
       # Moving left
       #
-      unless @map [ @y_cell ][ @x_cell - 1 ] == "0"
+      unless @map [ @y_cell ][ @x_cell - 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell - 1 ] == "E"
           show_end_screen
         elsif @x_sub_cell < CELL_MARGIN
@@ -168,7 +169,7 @@ class Game
     if @move_y > 0
       # Moving up
       #
-      unless @map[ @y_cell + 1 ][ @x_cell ] == "0"
+      unless @map[ @y_cell + 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell + 1 ][ @x_cell ] == "E"
           show_end_screen
         elsif @y_sub_cell > ( @grid_height - CELL_MARGIN )
@@ -178,7 +179,7 @@ class Game
     else
       # Moving down
       #
-      unless @map[ @y_cell - 1 ][ @x_cell ] == "0"
+      unless @map[ @y_cell - 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell - 1 ][ @x_cell ] == "E"
           show_end_screen
         elsif @y_sub_cell < CELL_MARGIN
@@ -363,9 +364,9 @@ class Game
 
           @x_cell = ( ( @x_bound + @next_x_cell ) / @grid_width ).to_i
           @y_cell = ( @yi.to_i / @grid_height ).to_i
-          @hit_type = @map[ @y_cell ][ @x_cell ] rescue "0"
+          @hit_type = @map[ @y_cell ][ @x_cell ] rescue MAP_EMPTY_CELL
 
-          if @hit_type != "0"
+          if @hit_type != MAP_EMPTY_CELL
             @x_dist = ( @yi - y_start ) * @inv_sin_table[ @view_angle ]
             @x_map = @map[ @y_cell ][ @x_cell ]
             @yi_save = @yi
@@ -389,9 +390,9 @@ class Game
 
           @x_cell = ( @xi.to_i / @grid_width ).to_i
           @y_cell = ( ( @y_bound + @next_y_cell ) / @grid_height ).to_i
-          @hit_type = @map[ @y_cell ][ @x_cell ] rescue "0"
+          @hit_type = @map[ @y_cell ][ @x_cell ] rescue MAP_EMPTY_CELL
 
-          if @hit_type != "0"
+          if @hit_type != MAP_EMPTY_CELL
             @y_dist = ( @xi - x_start ) * @inv_cos_table[ @view_angle ]
             @y_map = @map[ @y_cell ][ @x_cell ]
             @xi_save = @xi
@@ -471,49 +472,49 @@ class Game
     @map = \
     [
       %w( 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 ),
-      %w( 2 P 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 ),
-      %w( 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 ),
-      %w( 2 0 0 2 1 1 1 1 1 1 1 1 2 0 2 1 1 1 1 1 1 1 2 0 2 1 1 1 2 0 0 2 ),
-      %w( 2 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 3 2 2 2 2 2 2 2 2 3 0 3 2 2 2 2 2 2 2 3 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 4 3 3 3 3 3 3 3 3 3 3 3 3 4 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 5 4 4 4 4 4 4 5 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 0 0 0 0 0 0 0 4 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 5 4 4 4 4 4 4 4 0 0 3 0 0 2 0 0 2 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 4 0 0 3 0 0 2 0 0 0 0 0 2 ),
-      %w( 2 0 0 2 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 4 0 0 3 0 0 2 0 0 0 0 0 2 ),
-      %w( 2 0 0 0 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 4 0 0 3 0 0 2 0 0 2 0 0 2 ),
-      %w( 2 0 0 2 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 5 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 4 E E E E E E 0 0 M 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 5 4 4 4 4 4 4 5 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 4 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 4 3 3 3 3 3 3 3 3 3 3 3 3 4 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 3 0 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 0 3 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 2 ),
-      %w( 2 0 0 2 1 1 1 1 1 1 1 1 1 1 2 0 2 1 1 1 1 1 1 1 1 1 2 0 2 0 0 2 ),
-      %w( 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 ),
-      %w( 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 ),
+      %w( 2 P . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
+      %w( 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
+      %w( 2 . . 2 1 1 1 1 1 1 1 1 2 . 2 1 1 1 1 1 1 1 2 . 2 1 1 1 2 . . 2 ),
+      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
+      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
+      %w( 2 . . 1 . . 3 2 2 2 2 2 2 2 2 3 . 3 2 2 2 2 2 2 2 3 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . 5 4 4 4 4 4 4 5 . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . . . . . . . . 4 . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . 5 4 4 4 4 4 4 4 . . 3 . . 2 . . 2 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . 4 . . . . . . 4 . . 3 . . 2 . . . . . 2 ),
+      %w( 2 . . 2 . . 2 . . 3 . . 4 . . . . . . 4 . . 3 . . 2 . . . . . 2 ),
+      %w( 2 . . . . . 2 . . 3 . . 4 . . . . . . 4 . . 3 . . 2 . . 2 . . 2 ),
+      %w( 2 . . 2 . . 2 . . 3 . . 4 5 5 5 5 5 5 5 . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . 4 E . . . . . . . M 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 3 . . 5 4 4 4 4 4 4 5 . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 4 . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 3 . 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 . 3 . . 1 . . 2 ),
+      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
+      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
+      %w( 2 . . 2 1 1 1 1 1 1 1 1 1 1 2 . 2 1 1 1 1 1 1 1 1 1 2 . 2 . . 2 ),
+      %w( 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
+      %w( 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
       %w( 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 )
     ]
 
     for y in 0...@map_rows
       if x = @map[ y ].find_index( 'M' )
-        @map[ y ][ x ] = "0"
+        @map[ y ][ x ] = MAP_EMPTY_CELL
         @magic_x = x * @grid_width + ( @grid_width / 2 )
         @magic_y = y * @grid_height + ( @grid_height / 2 )
         @player_x = @starting_x
         @player_y = @starting_y
       elsif x = @map[ y ].find_index( 'P' )
-        @map[ y ][ x ] = "0"
+        @map[ y ][ x ] = MAP_EMPTY_CELL
         @starting_x = x * @grid_width + ( @grid_width / 2 )
         @starting_y = y * @grid_height + ( @grid_height / 2 )
         @player_x = @starting_x
@@ -723,23 +724,13 @@ class Game
     puts
     puts "[ Notes ]".center( @screen_width )
     puts
-    puts "All users: running this script in 'no color' mode ".center( @screen_width )
-    puts "should yield the best performance.  If you're     ".center( @screen_width )
-    puts "getting a lot of screen flicker or artifacts under".center( @screen_width )
-    puts "partial or full color mode, try disabling color by".center( @screen_width )
-    puts "pressing '1'.  You should also run this in a fresh".center( @screen_width )
-    puts "terminal window with no history.                  ".center( @screen_width )
+    puts "Windows users: testing has shown that running this".center( @screen_width )
+    puts "script in any color mode under most terminals will".center( @screen_width )
+    puts "result in very poor performance.  For now, it is  ".center( @screen_width )
+    puts "recommended that you run in 'no color' mode to    ".center( @screen_width )
+    puts "enjoy the highest framerate and best experience.  ".center( @screen_width )
     puts
-    puts "Windows users: partial and full color modes are   ".center( @screen_width )
-    puts "pretty slow right now, as is screen updating in   ".center( @screen_width )
-    puts "general.  Running this script under Powershell or ".center( @screen_width )
-    puts "another terminal may increase performance, but I  ".center( @screen_width )
-    puts "make no guarantees about this.                    ".center( @screen_width )
-    puts
-    puts "Further optimizations to the graphics system and  ".center( @screen_width )
-    puts "other additions are planned in future releases.   ".center( @screen_width )
-    puts
-    puts "Until then, enjoy the game!                       ".center( @screen_width )
+    puts "Enjoy the game!                                   ".center( @screen_width )
     puts
     puts "[ Keys ]".center( @screen_width )
     puts
