@@ -30,7 +30,40 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
+
+# Contains static game helper functions.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+module GameHelpers
+  COLOR_NONE = 1
+  COLOR_PARTIAL = 2
+  COLOR_FILL = 3
+
+  # Colorizes a given piece of text for display in the terminal.
+  #
+  # @param  [Integer] code  Terminal color code to use for colorizing
+  # @param  [String]  value Text value to colorize
+  # @option [Integer] mode  Desired color mode to use (1, 2, 3)
+  #
+  def colorize( code, value, mode = 0 )
+    case mode
+    when COLOR_NONE
+      value
+    else
+      "\e[#{ code };#{ code + ( mode == COLOR_FILL ? 10 : 0 ) }m#{ value }\e[0m";
+    end
+  end
+
+  # Helper function to convert degrees to radians.
+  #
+  # @param [Float] value Value in degrees to be converted to radians
+  #
+  def radians( value )
+    value * 0.0174533
+  end
+end
 
 # Handles all keyboard input for the application.
 #
@@ -78,11 +111,9 @@ end
 # Main game class
 #
 class Game
+  include GameHelpers
   include Math
 
-  COLOR_NONE = 1
-  COLOR_PARTIAL = 2
-  COLOR_FILL = 3
   CELL_MARGIN = 32
 
   def initialize
@@ -115,36 +146,44 @@ class Game
     if @move_x > 0
       # Moving right
       #
-      if @map[ @y_cell ][ @x_cell + 1 ] == "E"
-        show_end_screen
-      elsif ( @map[ @y_cell ][ @x_cell + 1 ] != "0" ) && ( @x_sub_cell > ( @grid_width - CELL_MARGIN ) )
-        @move_x -= @x_sub_cell - ( @grid_width - CELL_MARGIN )
+      unless @map[ @y_cell ][ @x_cell + 1 ] == "0"
+        if @map[ @y_cell ][ @x_cell + 1 ] == "E"
+          show_end_screen
+        elsif @x_sub_cell > ( @grid_width - CELL_MARGIN )
+          @move_x -= @x_sub_cell - ( @grid_width - CELL_MARGIN )
+        end
       end
     else
       # Moving left
       #
-      if @map[ @y_cell ][ @x_cell - 1 ] == "E"
-        show_end_screen
-      elsif ( @map [ @y_cell ][ @x_cell - 1 ] != "0" ) && ( @x_sub_cell < CELL_MARGIN )
-        @move_x += CELL_MARGIN - @x_sub_cell
+      unless @map [ @y_cell ][ @x_cell - 1 ] == "0"
+        if @map[ @y_cell ][ @x_cell - 1 ] == "E"
+          show_end_screen
+        elsif @x_sub_cell < CELL_MARGIN
+          @move_x += CELL_MARGIN - @x_sub_cell
+        end
       end
     end
 
     if @move_y > 0
       # Moving up
       #
-      if @map[ @y_cell + 1 ][ @x_cell ] == "E"
-        show_end_screen
-      elsif ( @map[ @y_cell + 1 ][ @x_cell ] != "0" ) && ( @y_sub_cell > ( @grid_height - CELL_MARGIN ) )
-        @move_y -= @y_sub_cell - ( @grid_height - CELL_MARGIN )
+      unless @map[ @y_cell + 1 ][ @x_cell ] == "0"
+        if @map[ @y_cell + 1 ][ @x_cell ] == "E"
+          show_end_screen
+        elsif @y_sub_cell > ( @grid_height - CELL_MARGIN )
+          @move_y -= @y_sub_cell - ( @grid_height - CELL_MARGIN )
+        end
       end
     else
       # Moving down
       #
-      if @map[ @y_cell - 1 ][ @x_cell ] == "E"
-        show_end_screen
-      elsif ( @map[ @y_cell - 1 ][ @x_cell ] != "0" ) && ( @y_sub_cell < CELL_MARGIN )
-        @move_y += CELL_MARGIN - @y_sub_cell
+      unless @map[ @y_cell - 1 ][ @x_cell ] == "0"
+        if @map[ @y_cell - 1 ][ @x_cell ] == "E"
+          show_end_screen
+        elsif @y_sub_cell < CELL_MARGIN
+          @move_y += CELL_MARGIN - @y_sub_cell
+        end
       end
     end
 
@@ -169,21 +208,6 @@ class Game
     end
 
     puts "\e[#{ @clear_rows }A"
-  end
-
-  # Colorizes a given piece of text for display in the terminal.
-  #
-  # @param  [Integer] code  Terminal color code to use for colorizing
-  # @param  [String]  value Text value to colorize
-  # @option [Integer] mode  Desired color mode to use (1, 2, 3)
-  #
-  def colorize( code, value, mode = 0 )
-    case mode
-    when COLOR_NONE
-      value
-    else
-      "\e[#{ code };#{ code + ( mode == COLOR_FILL ? 10 : 0 ) }m#{ value }\e[0m";
-    end
   end
 
   # Draws the current buffer to the screen.
@@ -256,19 +280,15 @@ class Game
       when "h"
         show_help_screen
 
+      when "m"
+        @player_x = @magic_x unless @magic_x.nil?
+        @player_y = @magic_y unless @magic_y.nil?
+
       when "q"
         show_exit_screen
     end
 
     update_buffer
-  end
-
-  # Helper function to convert degrees to radians.
-  #
-  # @param [Float] value Value in degrees to be converted to radians
-  #
-  def radians( value )
-    value * 0.0174533
   end
 
   # Our ray casting engine, AKA The Big Kahuna(tm).
@@ -469,7 +489,7 @@ class Game
       %w( 2 0 0 2 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 4 0 0 3 0 0 2 0 0 0 0 0 2 ),
       %w( 2 0 0 0 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 4 0 0 3 0 0 2 0 0 2 0 0 2 ),
       %w( 2 0 0 2 0 0 2 0 0 3 0 0 4 5 5 5 5 5 5 5 0 0 3 0 0 2 0 0 1 0 0 2 ),
-      %w( 2 0 0 1 0 0 2 0 0 3 0 0 4 E E E E E E 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
+      %w( 2 0 0 1 0 0 2 0 0 3 0 0 4 E E E E E E 0 0 M 3 0 0 2 0 0 1 0 0 2 ),
       %w( 2 0 0 1 0 0 2 0 0 3 0 0 5 4 4 4 4 4 4 5 0 0 3 0 0 2 0 0 1 0 0 2 ),
       %w( 2 0 0 1 0 0 2 0 0 4 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
       %w( 2 0 0 1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 2 0 0 1 0 0 2 ),
@@ -486,13 +506,18 @@ class Game
     ]
 
     for y in 0...@map_rows
-      if x = @map[ y ].find_index( 'P' )
+      if x = @map[ y ].find_index( 'M' )
+        @map[ y ][ x ] = "0"
+        @magic_x = x * @grid_width + ( @grid_width / 2 )
+        @magic_y = y * @grid_height + ( @grid_height / 2 )
+        @player_x = @starting_x
+        @player_y = @starting_y
+      elsif x = @map[ y ].find_index( 'P' )
         @map[ y ][ x ] = "0"
         @starting_x = x * @grid_width + ( @grid_width / 2 )
         @starting_y = y * @grid_height + ( @grid_height / 2 )
         @player_x = @starting_x
         @player_y = @starting_y
-        break
       end
     end
   end
