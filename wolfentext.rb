@@ -45,7 +45,7 @@ module GameHelpers
   #
   # @param  [Integer] code  Terminal color code to use for colorizing
   # @param  [String]  value Text value to colorize
-  # @option [Integer] mode  Desired color mode to use (1, 2, 3)
+  # @option [Integer] mode  Desired color mode to use (COLOR_X)
   #
   def colorize( code, value, mode = 0 )
     case mode
@@ -302,18 +302,61 @@ class Game
   # Clears the current screen.
   #
   def clear_screen( full = false )
-    if full
-      puts "\e[#{ @clear_rows }A"
-      puts "\n".rjust( 100 ) * @clear_rows
-    end
-
-    puts "\e[#{ @clear_rows }A"
+    puts "\e[2J" if full
+    puts "\e[1;1H"
   end
 
   # Draws the current buffer to the screen.
   #
   def draw_buffer
     puts @buffer.map { |b| b.join }.join( "\n" )
+  end
+
+  # Applies the selected screen wipe/transition to the active buffer.
+  #
+  # @param [Integer] type Desired wipe mode to use (WIPE_X)
+  #
+  def draw_screen_wipe( type )
+    case type
+    when WIPE_BLINDS
+      for j in 5.downto( 1 )
+        for y in ( 0...@buffer.size ).step( j )
+          for x in 0...@buffer[ y ].size
+            @buffer[ y ][ x ] = ""
+          end
+        end
+
+        clear_screen true
+        draw_buffer
+        sleep 0.25
+      end
+    when WIPE_PIXELIZE_IN
+      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
+        @buffer[ i / @screen_width ][ i % @screen_width ] = colorize( 5, " ", @color_mode )
+
+        if j % ( 4 ** @color_mode ) == 0
+          clear_screen
+          draw_buffer
+        end
+      end
+    when WIPE_PIXELIZE_OUT
+      @backup_buffer = Marshal.load( Marshal.dump( @buffer ) )
+
+      @buffer.map! do |row|
+        row.map! do |item|
+          colorize( 5, " ", @color_mode )
+        end
+      end
+
+      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
+        @buffer[ i / @screen_width ][ i % @screen_width ] = @backup_buffer[ i / @screen_width ][ i % @screen_width ]
+
+        if j % ( 4 ** @color_mode ) == 0
+          clear_screen
+          draw_buffer
+        end
+      end
+    end
   end
 
   # Displays the current status line on the screen.
@@ -688,49 +731,7 @@ class Game
 
     Input.get_key true
     clear_screen true
-  end
-
-  def draw_screen_wipe( type )
-    case type
-    when WIPE_BLINDS
-      for j in 5.downto( 1 )
-        for y in ( 0...@buffer.size ).step( j )
-          for x in 0...@buffer[ y ].size
-            @buffer[ y ][ x ] = ""
-          end
-        end
-
-        clear_screen true
-        draw_buffer
-        sleep 0.25
-      end
-    when WIPE_PIXELIZE_IN
-      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
-        @buffer[ i / @screen_width ][ i % @screen_width ] = colorize( 5, " ", @color_mode )
-
-        if j % ( 4 ** @color_mode ) == 0
-          clear_screen
-          draw_buffer
-        end
-      end
-    when WIPE_PIXELIZE_OUT
-      @backup_buffer = Marshal.load( Marshal.dump( @buffer ) )
-
-      @buffer.map! do |row|
-        row.map! do |item|
-          colorize( 5, " ", @color_mode )
-        end
-      end
-
-      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
-        @buffer[ i / @screen_width ][ i % @screen_width ] = @backup_buffer[ i / @screen_width ][ i % @screen_width ]
-
-        if j % ( 4 ** @color_mode ) == 0
-          clear_screen
-          draw_buffer
-        end
-      end
-    end
+    update_buffer
   end
 
   # Shows the ending screen.
@@ -828,6 +829,7 @@ class Game
 
     Input.get_key true
     clear_screen true
+    update_buffer
   end
 
   # Displays the application's title screen.
