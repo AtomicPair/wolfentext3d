@@ -30,7 +30,7 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 # Contains static game helper functions.
 #
@@ -67,39 +67,60 @@ end
 
 # Handles all keyboard input for the application.
 #
-# @author Aaron Cook <https://gist.github.com/acook/4190379>
-# @author Muriel Salvan <http://stackoverflow.com/a/22659929>
+# @author Muriel Salvan <http://blog.x-aeon.com/2014/03/26/how-to-read-one-non-blocking-key-press-in-ruby/>
+# @author James Gray II <http://graysoftinc.com/terminal-tricks/random-access-terminal>
+# @author Adam Parrott <parrott.adam@gmail.com>
 #
 module Input
   require 'io/console'
 
   @windows = begin
     require 'Win32API'
+    @win_get_char = Win32API.new( 'crtdll', '_getch', [], 'L' )
+    @win_kb_hit = Win32API.new( 'crtdll', '_kbhit', [], 'I' )
     true
   rescue LoadError
     false
   end
 
-  def self.get_key
-    if @windows
-      input = Win32API.new('crtdll', '_getch', [ ], 'L').Call.chr( Encoding::UTF_8 )
+  def self.clear_input
+    STDIN.ioflush
+    self.get_key false
+  end
 
-      if input == "\u00E0"
-        input << Win32API.new('crtdll', '_getch', [ ], 'L').Call.chr( Encoding::UTF_8 )
+  def self.get_key( blocking = true )
+    if @windows
+      if !blocking && @win_kb_hit.Call.zero?
+        input = nil
+      else
+        input = @win_get_char.Call.chr( Encoding::UTF_8 )
+
+        if input == "\u00E0"
+          input << @win_get_char.Call.chr( Encoding::UTF_8 )
+        end
       end
     else
       begin
-        STDIN.echo = false
-        STDIN.raw!
+        input = nil
 
-        input = STDIN.getc.chr
+        if blocking
+          input = STDIN.getc.chr
 
-        if input == "\e"
-          input << STDIN.read_nonblock(3) rescue nil
-          input << STDIN.read_nonblock(2) rescue nil
+          if input == "\e"
+            input << STDIN.read_nonblock( 3 ) rescue nil
+            input << STDIN.read_nonblock( 2 ) rescue nil
+          end
+        else
+          $stdin.raw do |io|
+            input = io.sysread( 1 ) rescue nil
+
+            if input == "\e"
+              input << STDIN.read_nonblock( 3 ) rescue nil
+              input << STDIN.read_nonblock( 2 ) rescue nil
+            end
+          end
         end
       ensure
-        STDIN.echo = true
         STDIN.cooked!
       end
     end
@@ -117,7 +138,8 @@ class Game
   CELL_MARGIN = 32
   MAP_EMPTY_CELL = "."
   WIPE_BLINDS = 1
-  WIPE_SPARKLE = 2
+  WIPE_PIXELIZE_IN = 2
+  WIPE_PIXELIZE_OUT = 3
 
   def initialize
     setup_variables
@@ -132,7 +154,8 @@ class Game
     update_buffer
 
     while true
-      get_input
+      check_input false
+      sleep 0.0167
     end
   end
 
@@ -194,11 +217,85 @@ class Game
     @player_y += @move_y
   end
 
+  # Waits for and processes keyboard input from user.
+  #
+  # @see https://gist.github.com/acook/4190379
+  #
+  def check_input( blocking = true )
+    key = Input.get_key( blocking )
+
+    return if !blocking && key.nil?
+
+    case key
+      # Escape
+      when "\e"
+
+      # Up arrow
+      when "\e[A", "\u00E0H", "w"
+        @move_x = ( @cos_table[ @player_angle ] * 4 ).round
+        @move_y = ( @sin_table[ @player_angle ] * 4 ).round
+        check_collisions
+        update_buffer
+
+      # Down arrow
+      when "\e[B", "\u00E0P", "s"
+        @move_x = -( @cos_table[ @player_angle ] * 4 ).round
+        @move_y = -( @sin_table[ @player_angle ] * 4 ).round
+        check_collisions
+        update_buffer
+
+      # Right arrow
+      when "\e[C", "\u00E0M", "d"
+        @player_angle = ( @player_angle + @angles[ 2 ] ) % @angles[ 360 ]
+        update_buffer
+
+      # Left arrow
+      when "\e[D", "\u00E0K", "a"
+        @player_angle = ( @player_angle - @angles[ 2 ] + @angles[ 360 ] ) % @angles[ 360 ]
+        update_buffer
+
+      # Ctrl-C
+      when "\u0003"
+        exit 0
+
+      when "1", "2", "3"
+        @color_mode = key.to_i
+        update_buffer
+
+      when "c"
+        @draw_ceiling = !@draw_ceiling
+        update_buffer
+
+      when "?"
+        show_debug_info
+
+      when "f"
+        @draw_floor = !@draw_floor
+        update_buffer
+
+      when "h"
+        show_help_screen
+
+      when "m"
+        draw_screen_wipe WIPE_PIXELIZE_IN
+        @player_x = @magic_x unless @magic_x.nil?
+        @player_y = @magic_y unless @magic_y.nil?
+        update_buffer
+        draw_screen_wipe WIPE_PIXELIZE_OUT
+        update_buffer
+
+      when "q"
+        show_exit_screen
+    end
+  end
+
   # Clears the current screen buffer.
   #
   def clear_buffer
-    for i in 0...@buffer.size
-      @buffer[ i ] = ""
+    @buffer.map! do |row|
+      row.map! do |char|
+        ""
+      end
     end
   end
 
@@ -216,7 +313,7 @@ class Game
   # Draws the current buffer to the screen.
   #
   def draw_buffer
-    puts @buffer
+    puts @buffer.map { |b| b.join }.join( "\n" )
   end
 
   # Displays the current status line on the screen.
@@ -231,67 +328,6 @@ class Game
     @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 18 )
 
     puts @status_left + @status_middle + @status_right
-  end
-
-  # Waits for and processes keyboard input from user.
-  #
-  # @see https://gist.github.com/acook/4190379
-  #
-  def get_input
-    key = Input.get_key
-
-    case key
-      # Escape
-      when "\e"
-
-      # Up arrow
-      when "\e[A", "\u00E0H", "w"
-        @move_x = ( @cos_table[ @player_angle ] * 4 ).round
-        @move_y = ( @sin_table[ @player_angle ] * 4 ).round
-        check_collisions
-
-      # Down arrow
-      when "\e[B", "\u00E0P", "s"
-        @move_x = -( @cos_table[ @player_angle ] * 4 ).round
-        @move_y = -( @sin_table[ @player_angle ] * 4 ).round
-        check_collisions
-
-      # Right arrow
-      when "\e[C", "\u00E0M", "d"
-        @player_angle = ( @player_angle + @angles[ 2 ] ) % @angles[ 360 ]
-
-      # Left arrow
-      when "\e[D", "\u00E0K", "a"
-        @player_angle = ( @player_angle - @angles[ 2 ] + @angles[ 360 ] ) % @angles[ 360 ]
-
-      # Ctrl-C
-      when "\u0003"
-        exit 0
-
-      when "1", "2", "3"
-        @color_mode = key.to_i
-
-      when "c"
-        @draw_ceiling = !@draw_ceiling
-
-      when "?"
-        show_debug_info
-
-      when "f"
-        @draw_floor = !@draw_floor
-
-      when "h"
-        show_help_screen
-
-      when "m"
-        @player_x = @magic_x unless @magic_x.nil?
-        @player_y = @magic_y unless @magic_y.nil?
-
-      when "q"
-        show_exit_screen
-    end
-
-    update_buffer
   end
 
   # Our ray casting engine, AKA The Big Kahuna(tm).
@@ -449,7 +485,7 @@ class Game
       @sliver = @string.split( "," )
 
       for y in 0...@screen_height
-        @buffer[ y ] += @sliver[ y ]
+        @buffer[ y ][ ray ] = @sliver[ y ]
       end
 
       @view_angle = ( @view_angle + 1 ) % @angles[ 360 ]
@@ -613,7 +649,7 @@ class Game
       "ARE WE HAVING FUN YET?"
     ]
 
-    @buffer = Array.new( @screen_height )
+    @buffer = Array.new( @screen_height ) { Array.new( @screen_width ) }
   end
 
   # Displays the game's debug screen, waiting for the user to
@@ -650,8 +686,7 @@ class Game
     puts "Press any key to continue...".center( @screen_width )
     puts
 
-    Input.get_key
-
+    Input.get_key true
     clear_screen true
   end
 
@@ -659,22 +694,41 @@ class Game
     case type
     when WIPE_BLINDS
       for j in 5.downto( 1 )
-        for i in 0...@buffer.size
-          @buffer[ i ] = "" if i % j == 0
+        for y in ( 0...@buffer.size ).step( j )
+          for x in 0...@buffer[ y ].size
+            @buffer[ y ][ x ] = ""
+          end
         end
 
         clear_screen true
         draw_buffer
         sleep 0.25
       end
-    when WIPE_SPARKLE
-      srand 1234
+    when WIPE_PIXELIZE_IN
+      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
+        @buffer[ i / @screen_width ][ i % @screen_width ] = colorize( 5, " ", @color_mode )
 
-      for i in 1..( @buffer.size * @screen_width )
-        @rand = rand( @buffer.size * @screen_width )
-        @buffer[ @rand / @screen_width ][ @rand % @screen_width ] = "*"
-        clear_screen
-        draw_buffer
+        if j % ( 4 ** @color_mode ) == 0
+          clear_screen
+          draw_buffer
+        end
+      end
+    when WIPE_PIXELIZE_OUT
+      @backup_buffer = Marshal.load( Marshal.dump( @buffer ) )
+
+      @buffer.map! do |row|
+        row.map! do |item|
+          colorize( 5, " ", @color_mode )
+        end
+      end
+
+      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
+        @buffer[ i / @screen_width ][ i % @screen_width ] = @backup_buffer[ i / @screen_width ][ i % @screen_width ]
+
+        if j % ( 4 ** @color_mode ) == 0
+          clear_screen
+          draw_buffer
+        end
       end
     end
   end
@@ -682,7 +736,7 @@ class Game
   # Shows the ending screen.
   #
   def show_end_screen
-    draw_screen_wipe WIPE_SPARKLE
+    draw_screen_wipe WIPE_BLINDS
     clear_screen true
 
     puts "\n" * ( ( @screen_height / 2 ) - 7 )
@@ -701,7 +755,11 @@ class Game
     puts "Press any key to find out!".center( 72 )
     puts "\n" * ( ( @screen_height / 2 ) - 7 )
 
-    Input.get_key
+    sleep 1
+
+    Input.clear_input
+    Input.get_key true
+    Input.clear_input
 
     @play_counter += 1
 
@@ -768,8 +826,7 @@ class Game
     puts "Press any key to continue...".center( @screen_width )
     puts
 
-    Input.get_key
-
+    Input.get_key true
     clear_screen true
   end
 
@@ -784,8 +841,7 @@ class Game
     puts
     puts "Press any key to start...".center( 88 )
 
-    Input.get_key
-
+    Input.get_key true
     clear_screen true
   end
 
