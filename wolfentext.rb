@@ -116,6 +116,8 @@ class Game
 
   CELL_MARGIN = 32
   MAP_EMPTY_CELL = "."
+  WIPE_BLINDS = 1
+  WIPE_SPARKLE = 2
 
   def initialize
     setup_variables
@@ -653,21 +655,34 @@ class Game
     clear_screen true
   end
 
+  def draw_screen_wipe( type )
+    case type
+    when WIPE_BLINDS
+      for j in 5.downto( 1 )
+        for i in 0...@buffer.size
+          @buffer[ i ] = "" if i % j == 0
+        end
+
+        clear_screen true
+        draw_buffer
+        sleep 0.25
+      end
+    when WIPE_SPARKLE
+      srand 1234
+
+      for i in 1..( @buffer.size * @screen_width )
+        @rand = rand( @buffer.size * @screen_width )
+        @buffer[ @rand / @screen_width ][ @rand % @screen_width ] = "*"
+        clear_screen
+        draw_buffer
+      end
+    end
+  end
+
   # Shows the ending screen.
   #
   def show_end_screen
-    # Obligator fade-out effect
-    #
-    for j in 5.downto( 1 )
-      for i in 0...@buffer.size
-        @buffer[ i ] = "" if i % j == 0
-      end
-
-      clear_screen true
-      draw_buffer
-      sleep 0.25
-    end
-
+    draw_screen_wipe WIPE_SPARKLE
     clear_screen true
 
     puts "\n" * ( ( @screen_height / 2 ) - 7 )
