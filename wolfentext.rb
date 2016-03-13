@@ -30,7 +30,7 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 # Contains static game helper functions.
 #
@@ -56,6 +56,14 @@ module GameHelpers
     end
   end
 
+  # Custom puts output method to handle unique console configuration.
+  #
+  # @param [String] The text value to be output to the console
+  #
+  def puts( string = "" )
+    STDOUT.write "#{ string }\r\n"
+  end
+
   # Helper function to convert degrees to radians.
   #
   # @param [Float] value Value in degrees to be converted to radians
@@ -68,60 +76,68 @@ end
 # Handles all keyboard input for the application.
 #
 # @author Muriel Salvan <http://blog.x-aeon.com/2014/03/26/how-to-read-one-non-blocking-key-press-in-ruby/>
-# @author James Gray II <http://graysoftinc.com/terminal-tricks/random-access-terminal>
+# @author James Edward Gray II <http://graysoftinc.com/terminal-tricks/random-access-terminal>
 # @author Adam Parrott <parrott.adam@gmail.com>
 #
-module Input
+module GameInput
   require 'io/console'
+  require 'io/wait'
 
-  @windows = begin
+  # Since the require statement driving this condition could still fail
+  # on some Windows systems, this is not an ideal solution.  TODO: we should
+  # ask the OS to identify itself, then resolve from there. [ABP 201603013]
+  #
+  WINDOWS_INPUT = begin
     require 'Win32API'
-    @win_get_char = Win32API.new( 'crtdll', '_getch', [], 'L' )
-    @win_kb_hit = Win32API.new( 'crtdll', '_kbhit', [], 'I' )
+    WINDOWS_GET_CHAR = Win32API.new( 'crtdll', '_getch', [], 'L' )
+    WINDOWS_KB_HIT = Win32API.new( 'crtdll', '_kbhit', [], 'I' )
     true
   rescue LoadError
     false
   end
 
-  def self.clear_input
+  # Clears the current input buffer of any data.
+  #
+  def clear_input
     STDIN.ioflush
-    self.get_key false
+    self.get_key
   end
 
-  def self.get_key( blocking = true )
-    if @windows
-      if !blocking && @win_kb_hit.Call.zero?
+  # Waits for and returns the first character entered by a user.
+  #
+  def wait_key
+    if WINDOWS_INPUT
+      input = WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
+
+      if input == "\u00E0"
+        input << WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
+      end
+    else
+      input = STDIN.getc.chr
+    end
+
+    return input
+  end
+
+  # Returns the first key found in the current input buffer.
+  #
+  def get_key
+    if WINDOWS_INPUT
+      if WINDOWS_KB_HIT.Call.zero?
         input = nil
       else
-        input = @win_get_char.Call.chr( Encoding::UTF_8 )
+        input = WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
 
         if input == "\u00E0"
-          input << @win_get_char.Call.chr( Encoding::UTF_8 )
+          input << WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
         end
       end
     else
-      begin
-        input = nil
+      input = STDIN.read_nonblock( 1 ).chr rescue nil
 
-        if blocking
-          input = STDIN.getc.chr
-
-          if input == "\e"
-            input << STDIN.read_nonblock( 3 ) rescue nil
-            input << STDIN.read_nonblock( 2 ) rescue nil
-          end
-        else
-          $stdin.raw do |io|
-            input = io.sysread( 1 ) rescue nil
-
-            if input == "\e"
-              input << STDIN.read_nonblock( 3 ) rescue nil
-              input << STDIN.read_nonblock( 2 ) rescue nil
-            end
-          end
-        end
-      ensure
-        STDIN.cooked!
+      if input == "\e"
+        input << STDIN.read_nonblock( 3 ) rescue nil
+        input << STDIN.read_nonblock( 2 ) rescue nil
       end
     end
 
@@ -131,8 +147,11 @@ end
 
 # Main game class
 #
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
 class Game
   include GameHelpers
+  include GameInput
   include Math
 
   CELL_MARGIN = 32
@@ -145,17 +164,27 @@ class Game
     setup_variables
     setup_tables
     setup_map
+    setup_input
   end
 
   # This is where the magic happens.  :-)
   #
   def play
     show_title_screen
+    reset_frame_rate
     update_buffer
 
-    while true
-      check_input false
-      sleep 0.0167
+    begin
+      while true
+        check_input
+        update_frame_rate
+        draw_debug_info if @display_debug_info
+        sleep 0.01
+
+        @frames_rendered += 1
+      end
+    ensure
+      reset_input
     end
   end
 
@@ -170,7 +199,7 @@ class Game
     @y_sub_cell = @player_y % @grid_height
 
     if @move_x > 0
-      # Moving right
+      # Player is moving right
       #
       unless @map[ @y_cell ][ @x_cell + 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell + 1 ] == "E"
@@ -180,7 +209,7 @@ class Game
         end
       end
     else
-      # Moving left
+      # Player is moving left
       #
       unless @map [ @y_cell ][ @x_cell - 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell - 1 ] == "E"
@@ -192,7 +221,7 @@ class Game
     end
 
     if @move_y > 0
-      # Moving up
+      # Player is moving up
       #
       unless @map[ @y_cell + 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell + 1 ][ @x_cell ] == "E"
@@ -202,7 +231,7 @@ class Game
         end
       end
     else
-      # Moving down
+      # Player is moving down
       #
       unless @map[ @y_cell - 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell - 1 ][ @x_cell ] == "E"
@@ -221,10 +250,10 @@ class Game
   #
   # @see https://gist.github.com/acook/4190379
   #
-  def check_input( blocking = true )
-    key = Input.get_key( blocking )
+  def check_input
+    key = get_key
 
-    return if !blocking && key.nil?
+    return if key.nil?
 
     case key
       # Escape
@@ -267,7 +296,7 @@ class Game
         update_buffer
 
       when "?"
-        show_debug_info
+        show_debug_screen
 
       when "f"
         @draw_floor = !@draw_floor
@@ -275,6 +304,10 @@ class Game
 
       when "h"
         show_help_screen
+
+      when "i"
+        @display_debug_info = !@display_debug_info
+        update_buffer
 
       when "m"
         draw_screen_wipe WIPE_PIXELIZE_IN
@@ -303,13 +336,20 @@ class Game
   #
   def clear_screen( full = false )
     puts "\e[2J" if full
-    puts "\e[1;1H"
+    puts "\e[0;0H"
   end
 
   # Draws the current buffer to the screen.
   #
   def draw_buffer
-    puts @buffer.map { |b| b.join }.join( "\n" )
+    puts @buffer.map { |b| b.join }.join( "\r\n" )
+  end
+
+  # Draws extra information onto HUD.
+  #
+  def draw_debug_info
+    STDOUT.write "\e[0;#{ @screen_width - 9 }H"
+    STDOUT.write "#{ '%.2f' % @frame_rate } fps"
   end
 
   # Applies the selected screen wipe/transition to the active buffer.
@@ -330,6 +370,7 @@ class Game
         draw_buffer
         sleep 0.25
       end
+
     when WIPE_PIXELIZE_IN
       ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
         @buffer[ i / @screen_width ][ i % @screen_width ] = colorize( 5, " ", @color_mode )
@@ -339,6 +380,7 @@ class Game
           draw_buffer
         end
       end
+
     when WIPE_PIXELIZE_OUT
       @backup_buffer = Marshal.load( Marshal.dump( @buffer ) )
 
@@ -367,7 +409,7 @@ class Game
     @status_angle = ( ( @player_angle / @fixed_step ).round ).to_s.rjust( 3 )
 
     @status_left = "(Press H for help)".ljust( 18 )
-    @status_middle = @hud_messages[ @play_counter % 3 ].center( 44 )
+    @status_middle = @hud_messages[ @play_count % 3 ].center( 44 )
     @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 18 )
 
     puts @status_left + @status_middle + @status_right
@@ -535,12 +577,33 @@ class Game
     end
   end
 
+  # Resets the frame rate metrics.
+  #
+  def reset_frame_rate
+    @frames_rendered = 0
+    @frame_start_time = Time.now
+    @frame_rate = 0.0
+  end
+
+  # Resets the console input stream back to default.
+  #
+  def reset_input
+    STDIN.cooked!
+  end
+
   # Resets player's position.
   #
   def reset_player
     @player_angle = @starting_angle
     @player_x = @starting_x
     @player_y = @starting_y
+  end
+
+  # Configures the console input stream for game usage.
+  #
+  def setup_input
+    STDIN.raw!
+    STDIN.echo = false
   end
 
   # Configures the world map.
@@ -669,13 +732,15 @@ class Game
     @starting_angle = 0
     @player_angle = 0
     @player_fov = 60
-    @play_counter = 0
 
     @fixed_factor = 512
     @fixed_count = ( 360 * @screen_width ) / @player_fov
     @fixed_step = @fixed_count / 360.0
 
-    @clear_rows = 80
+    @frames_rendered = 0
+    @frame_rate = 0.0
+    @frame_start_time = 0.0
+    @play_count = 0
 
     @color_mode = COLOR_NONE
     @draw_ceiling = true
@@ -685,6 +750,7 @@ class Game
     @floor_texture = "."
     @wall_texture = "#"
 
+    @display_debug_info = false
     @hud_messages =
     [
       "FIND THE EXIT!",
@@ -698,7 +764,7 @@ class Game
   # Displays the game's debug screen, waiting for the user to
   # press a key before returning control back to the caller.
   #
-  def show_debug_info
+  def show_debug_screen
     clear_screen true
 
     puts
@@ -708,12 +774,17 @@ class Game
     puts
     puts ( "Color mode".ljust( 25 )          + @color_mode.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "Ceiling enabled?".ljust( 25 )    + @draw_ceiling.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "Display extra info?".ljust( 25 ) + @display_debug_info.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "Floor enabled?".ljust( 25 )      + @draw_floor.to_s.rjust( 25 ) ).center( @screen_width )
     puts
-    puts "[ Variables ]".center( @screen_width )
+    puts "[ Metrics ]".center( @screen_width )
     puts
+    puts ( "frames_rendered".ljust( 25 )     + @frames_rendered.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "frame_rate".ljust( 25 )          + @frame_rate.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "frame_total_time".ljust( 25 )    + ( Time.now - @frame_start_time ).to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "grid_height".ljust( 25 )         + @grid_height.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "grid_width".ljust( 25 )          + @grid_width.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "play_count".ljust( 25 )          + @play_count.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_angle".ljust( 25 )        + ( @player_angle / @fixed_step ).to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_angle_raw".ljust( 25 )    + @player_angle.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_fov".ljust( 25 )          + @player_fov.to_s.rjust( 25 ) ).center( @screen_width )
@@ -729,7 +800,7 @@ class Game
     puts "Press any key to continue...".center( @screen_width )
     puts
 
-    Input.get_key true
+    wait_key
     clear_screen true
     update_buffer
   end
@@ -740,7 +811,7 @@ class Game
     draw_screen_wipe WIPE_BLINDS
     clear_screen true
 
-    puts "\n" * ( ( @screen_height / 2 ) - 7 )
+    puts $/ * ( ( @screen_height / 2 ) - 7 )
     puts "You have reached...".center( 72 )
     puts "                ,,                                                  ,,  "
     puts " MMP''MM''YMM `7MM                    `7MM'''YMM                  `7MM  "
@@ -754,15 +825,12 @@ class Game
     puts "...or have you?".center( 72 )
     puts
     puts "Press any key to find out!".center( 72 )
-    puts "\n" * ( ( @screen_height / 2 ) - 7 )
+    puts $/ * ( ( @screen_height / 2 ) - 7 )
 
-    sleep 1
+    clear_input
+    wait_key
 
-    Input.clear_input
-    Input.get_key true
-    Input.clear_input
-
-    @play_counter += 1
+    @play_count += 1
 
     reset_player
     clear_screen true
@@ -813,8 +881,9 @@ class Game
     puts ( "Turn left".ljust( 25 )      + "A, Left Arrow".rjust( 25 ) ).center( @screen_width )
     puts ( "Turn right".ljust( 25 )     + "D, Right Arrow".rjust( 25 ) ).center( @screen_width )
     puts
-    puts ( "Toggle ceiling".ljust( 25 ) + "C".rjust( 25 ) ).center( @screen_width )
-    puts ( "Toggle floor".ljust( 25 )   + "F".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle ceiling".ljust( 25 )    + "C".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle debug info".ljust( 25 ) + "I".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle floor".ljust( 25 )      + "F".rjust( 25 ) ).center( @screen_width )
     puts
     puts colorize( 34, ( "No color".ljust( 25 )      + "1".rjust( 25 ) ).center( @screen_width ), 2 )
     puts colorize( 32, ( "Partial color".ljust( 25 ) + "2".rjust( 25 ) ).center( @screen_width ), 2 )
@@ -827,7 +896,7 @@ class Game
     puts "Press any key to continue...".center( @screen_width )
     puts
 
-    Input.get_key true
+    wait_key
     clear_screen true
     update_buffer
   end
@@ -843,7 +912,7 @@ class Game
     puts
     puts "Press any key to start...".center( 88 )
 
-    Input.get_key true
+    wait_key
     clear_screen true
   end
 
@@ -890,6 +959,16 @@ class Game
     clear_screen
     draw_buffer
     draw_status_line
+  end
+
+  # Updates the current frame rate metric.
+  #
+  def update_frame_rate
+    if ( Time.now - @frame_start_time ) >= 1.0
+      @frame_rate = ( @frames_rendered / ( Time.now - @frame_start_time ) ).round( 2 )
+      @frames_rendered = 0
+      @frame_start_time = Time.now
+    end
   end
 end
 
