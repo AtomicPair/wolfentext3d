@@ -41,15 +41,16 @@ Wolfentext is proudly (if not somewhat arbitrarily) written in pure Ruby.  Where
 Features
 ========
 
-Here are the items and features currently supported in Wolfentext:
+Here are the features currently supported in Wolfentext:
 
 * Solid orthogonal walls
 * Floor colors and "textures"
 * Ceiling colors and "textures"
 * Collision detection with wall sliding
 * Title, help, debug, and ending screens
+* 16 colors of super-pixelated eye candy!
 
-...and here are some items presently **missing** that may be added later:
+...and here are some **missing** features that are in the works:
 
 * Wall textures
 * Sliding doors
@@ -57,6 +58,9 @@ Here are the items and features currently supported in Wolfentext:
 * Stationary and usable objects
 * Enemies and other entities
 * Sounds or music
+* Resizeable viewport
+* OS and terminal type detection
+* 256 colors (on supported terminals)
 
 Requirements
 ============
@@ -88,8 +92,8 @@ Notes
 Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some known issues with the game of which you should be aware:
 
 * *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, achieving framerates up to 60 fps.  However, Windows users may notice **significant** performance issues when using *any* color mode in the native Comand Prompt or Powershell terminals.  Other third-party terminals may yield better performance but have not yet been tested.
-* *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release.
-* *Timing*: Currently, there are no delta time calculations applied to the screen updates, player movements, or world events.  This could cause events to occur slower or faster than expected, depending on the speed of your machine and terminal.
+* *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release, assuming we can find a sensible cross-platform method that works.
+* *Terminal*: At present, the code assumes you are running this script in a compatible terminal.  Logic should be added that detects not only the current terminal upon program start, but also what features are presently available to that terminal and whether they are compatible with the current version of Wolfentext.
 * *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further graphical optimizations for Windows users, (2) further refinement to the ray casting lookup tables, and (3) better memory profiling to identify and reduce overall resource allocations.
 
 Any thoughts or suggestions for solving these problems -- including pull requests -- are always welcome!

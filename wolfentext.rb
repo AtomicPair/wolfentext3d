@@ -30,32 +30,53 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
+
+module Color
+  BLACK         = 30
+  BLUE          = 34
+  CYAN          = 36
+  GRAY          = 90
+  GREEN         = 32
+  LIGHT_BLUE    = 94
+  LIGHT_CYAN    = 96
+  LIGHT_GRAY    = 37
+  LIGHT_GREEN   = 92
+  LIGHT_MAGENTA = 95
+  LIGHT_RED     = 91
+  LIGHT_YELLOW  = 93
+  MAGENTA       = 35
+  RED           = 31
+  WHITE         = 97
+  YELLOW        = 33
+
+  MODE_NONE    = 1
+  MODE_PARTIAL = 2
+  MODE_FILL    = 3
+
+  # Colorizes a given piece of text for display in the terminal.
+  #
+  # @param  [String]  value Text value to colorize
+  # @param  [Integer] color Terminal color code to use for colorizing
+  # @option [Integer] mode  Desired color mode to use (Color::MODE_X)
+  #
+  def self.colorize( value, color, mode = 0 )
+    case mode
+    when MODE_NONE
+      value
+    when MODE_PARTIAL
+      "\e[1;#{ color }m#{ value }\e[0m";
+    when MODE_FILL
+      "\e[7;#{ color };#{ color + 10 }m \e[0m";
+    end
+  end
+end
 
 # Contains static game helper functions.
 #
 # @author Adam Parrott <parrott.adam@gmail.com>
 #
 module GameHelpers
-  COLOR_NONE = 1
-  COLOR_PARTIAL = 2
-  COLOR_FILL = 3
-
-  # Colorizes a given piece of text for display in the terminal.
-  #
-  # @param  [Integer] code  Terminal color code to use for colorizing
-  # @param  [String]  value Text value to colorize
-  # @option [Integer] mode  Desired color mode to use (COLOR_X)
-  #
-  def colorize( code, value, mode = 0 )
-    case mode
-    when COLOR_NONE
-      value
-    else
-      "\e[#{ code };#{ code + ( mode == COLOR_FILL ? 10 : 0 ) }m#{ value }\e[0m";
-    end
-  end
-
   # Custom puts output method to handle unique console configuration.
   #
   # @param [String] The text value to be output to the console
@@ -174,17 +195,13 @@ class Game
     reset_frame_rate
     update_buffer
 
-    begin
-      while true
-        check_input
-        update_frame_rate
-        draw_debug_info if @display_debug_info
-        sleep 0.01
+    while true
+      check_input
+      update_frame_rate
+      draw_debug_info if @display_debug_info
+      sleep 0.01
 
-        @frames_rendered += 1
-      end
-    ensure
-      reset_input
+      @frames_rendered += 1
     end
   end
 
@@ -200,7 +217,6 @@ class Game
 
     if @move_x > 0
       # Player is moving right
-      #
       unless @map[ @y_cell ][ @x_cell + 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell + 1 ] == "E"
           show_end_screen
@@ -210,7 +226,6 @@ class Game
       end
     else
       # Player is moving left
-      #
       unless @map [ @y_cell ][ @x_cell - 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell - 1 ] == "E"
           show_end_screen
@@ -222,7 +237,6 @@ class Game
 
     if @move_y > 0
       # Player is moving up
-      #
       unless @map[ @y_cell + 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell + 1 ][ @x_cell ] == "E"
           show_end_screen
@@ -232,7 +246,6 @@ class Game
       end
     else
       # Player is moving down
-      #
       unless @map[ @y_cell - 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell - 1 ][ @x_cell ] == "E"
           show_end_screen
@@ -307,6 +320,7 @@ class Game
 
       when "i"
         @display_debug_info = !@display_debug_info
+        clear_screen true
         update_buffer
 
       when "m"
@@ -348,8 +362,8 @@ class Game
   # Draws extra information onto HUD.
   #
   def draw_debug_info
-    STDOUT.write "\e[0;#{ @screen_width - 9 }H"
-    STDOUT.write "#{ '%.2f' % @frame_rate } fps"
+    STDOUT.write "\e[1;#{ @screen_width - 10 }H"
+    STDOUT.write " #{ '%.2f' % @frame_rate } fps "
   end
 
   # Applies the selected screen wipe/transition to the active buffer.
@@ -373,7 +387,7 @@ class Game
 
     when WIPE_PIXELIZE_IN
       ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
-        @buffer[ i / @screen_width ][ i % @screen_width ] = colorize( 5, " ", @color_mode )
+        @buffer[ i / @screen_width ][ i % @screen_width ] = Color.colorize( " ", Color::WHITE, @color_mode )
 
         if j % ( 4 ** @color_mode ) == 0
           clear_screen
@@ -386,7 +400,7 @@ class Game
 
       @buffer.map! do |row|
         row.map! do |item|
-          colorize( 5, " ", @color_mode )
+          Color.colorize( " ", Color::WHITE, @color_mode )
         end
       end
 
@@ -410,12 +424,12 @@ class Game
 
     @status_left = "(Press H for help)".ljust( 18 )
     @status_middle = @hud_messages[ @play_count % 3 ].center( 44 )
-    @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 18 )
+    @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }°".ljust( 18 )
 
     puts @status_left + @status_middle + @status_right
   end
 
-  # Our ray casting engine, AKA The Big Kahuna(tm).
+  # Our ray casting engine, AKA The Big Kahuna(TM).
   #
   # Many thanks to Andre LaMothe for serving as the inspiration behind
   # the original engine that drives this ray caster today.
@@ -549,16 +563,17 @@ class Game
       @wall_scale = ( @scale / 2 ).to_i
       @wall_top = ( @screen_height / 2 ) - @wall_scale
       @wall_bottom = ( @screen_height / 2 ) + @wall_scale
-      @wall_color = ( 33 + @map_type.to_i )
-      @wall_sliver = colorize( @wall_color, @wall_color.chr, @color_mode )
+      @wall_color = @wall_colors[ @map_type ]
+      @wall_texture = ( 32 + @map_type.to_i ).chr
+      @wall_sliver = Color.colorize( @wall_texture, @wall_color, @color_mode )
 
       @ceiling_sliver = if @draw_ceiling
-                          colorize( @ceiling_texture.bytes.first, @ceiling_texture, @color_mode )
+                          Color.colorize( @ceiling_texture, Color::LIGHT_GRAY, @color_mode )
                         else
                           " "
                         end
       @floor_sliver = if @draw_floor
-                          colorize( @floor_texture.bytes.first, @floor_texture, @color_mode )
+                          Color.colorize( @floor_texture, Color::GRAY, @color_mode )
                         else
                           " "
                         end
@@ -589,6 +604,7 @@ class Game
   #
   def reset_input
     STDIN.cooked!
+    STDOUT.write "\e[?25h"
   end
 
   # Resets player's position.
@@ -604,6 +620,11 @@ class Game
   def setup_input
     STDIN.raw!
     STDIN.echo = false
+    STDOUT.write "\e[?25l"
+
+    at_exit do
+      reset_input
+    end
   end
 
   # Configures the world map.
@@ -621,27 +642,27 @@ class Game
       %w( 2 . . 2 1 1 1 1 1 1 1 1 2 . 2 1 1 1 1 1 1 1 2 . 2 1 1 1 2 . . 2 ),
       %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
       %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
-      %w( 2 . . 1 . . 3 2 2 2 2 2 2 2 2 3 . 3 2 2 2 2 2 2 2 3 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . 5 4 4 4 4 4 4 5 . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . . . . . . . . 4 . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . 5 4 4 4 4 4 4 4 . . 3 . . 2 . . 2 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . 4 . . . . . . 4 . . 3 . . 2 . . . . . 2 ),
-      %w( 2 . . 2 . . 2 . . 3 . . 4 . . . . . . 4 . . 3 . . 2 . . . . . 2 ),
-      %w( 2 . . . . . 2 . . 3 . . 4 . . . . . . 4 . . 3 . . 2 . . 2 . . 2 ),
-      %w( 2 . . 2 . . 2 . . 3 . . 4 5 5 5 5 5 5 5 . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . 4 E . . . . . . . M 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 3 . . 5 4 4 4 4 4 4 5 . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 4 . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . 3 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 2 . . . . . . . . . . . . . . . . . . 2 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 3 . 3 2 2 2 2 2 2 2 2 2 2 2 2 2 2 3 . 3 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 3 4 4 4 4 4 4 4 4 3 . 3 4 4 4 4 4 4 4 3 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . 6 5 5 5 5 5 5 6 . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . . . . . . . . 5 . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . 6 5 5 5 5 5 5 5 . . 3 . . 4 . . 2 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . 5 . . . . . . 5 . . 3 . . 4 . . . . . 2 ),
+      %w( 2 . . 2 . . 4 . . 3 . . 5 . . . . . . 5 . . 3 . . 4 . . . . . 2 ),
+      %w( 2 . . . . . 4 . . 3 . . 5 . . . . . . 5 . . 3 . . 4 . . 2 . . 2 ),
+      %w( 2 . . 2 . . 4 . . 3 . . 5 5 5 5 5 5 5 6 . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . 5 E . . . . . . . M 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 3 . . 6 5 5 5 5 5 5 6 . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 4 . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
+      %w( 2 . . 1 . . 3 . 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 3 . 3 . . 1 . . 2 ),
       %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
       %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
       %w( 2 . . 2 1 1 1 1 1 1 1 1 1 1 2 . 2 1 1 1 1 1 1 1 1 1 2 . 2 . . 2 ),
@@ -680,11 +701,14 @@ class Game
     @inv_tan_table = []
     @x_step = []
     @y_step = []
+    @wall_colors = {}
 
     for i in 0..360
       @angles[ i ] = ( i * @fixed_step ).round
     end
 
+    # Configure our trigonometric lookup tables, because math is good.
+    #
     for angle in @angles[ 0 ]..@angles[ 360 ]
       rad_angle = ( 3.272e-4 ) + angle * 2 * 3.141592654 / @angles[ 360 ]
 
@@ -713,6 +737,16 @@ class Game
       rad_angle = ( 3.272e-4 ) + angle * 2 * 3.141592654 / @angles[ 360 ]
       @fish_eye_table[ angle + @angles[ 30 ] ] = 1.0 / cos( rad_angle )
     end
+
+    # Configure some basic lookup tables for our wall colors.
+    #
+    @wall_colors[ '1' ] = Color::BLUE
+    @wall_colors[ '2' ] = Color::LIGHT_BLUE
+    @wall_colors[ '3' ] = Color::GREEN
+    @wall_colors[ '4' ] = Color::LIGHT_GREEN
+    @wall_colors[ '5' ] = Color::YELLOW
+    @wall_colors[ '6' ] = Color::LIGHT_YELLOW
+    @wall_colors[ 'E' ] = Color::BLACK
   end
 
   # Configures all application variables.
@@ -742,12 +776,12 @@ class Game
     @frame_start_time = 0.0
     @play_count = 0
 
-    @color_mode = COLOR_NONE
+    @color_mode = Color::MODE_NONE
     @draw_ceiling = true
-    @draw_floor = false
+    @draw_floor = true
 
     @ceiling_texture = "%"
-    @floor_texture = "."
+    @floor_texture = "-"
     @wall_texture = "#"
 
     @display_debug_info = false
@@ -885,9 +919,9 @@ class Game
     puts ( "Toggle debug info".ljust( 25 ) + "I".rjust( 25 ) ).center( @screen_width )
     puts ( "Toggle floor".ljust( 25 )      + "F".rjust( 25 ) ).center( @screen_width )
     puts
-    puts colorize( 34, ( "No color".ljust( 25 )      + "1".rjust( 25 ) ).center( @screen_width ), 2 )
-    puts colorize( 32, ( "Partial color".ljust( 25 ) + "2".rjust( 25 ) ).center( @screen_width ), 2 )
-    puts colorize( 33, ( "Full color".ljust( 25 )    + "3".rjust( 25 ) ).center( @screen_width ), 2 )
+    puts Color.colorize( ( "No color".ljust( 25 )      + "1".rjust( 25 ) ).center( @screen_width ), Color::BLUE, 2 )
+    puts Color.colorize( ( "Partial color".ljust( 25 ) + "2".rjust( 25 ) ).center( @screen_width ), Color::GREEN, 2 )
+    puts Color.colorize( ( "Full color".ljust( 25 )    + "3".rjust( 25 ) ).center( @screen_width ), Color::YELLOW, 2 )
     puts
     puts ( "Debug screen".ljust( 25 )   + "?".rjust( 25 ) ).center( @screen_width )
     puts ( "Help screen".ljust( 25 )    + "H".rjust( 25 ) ).center( @screen_width )
