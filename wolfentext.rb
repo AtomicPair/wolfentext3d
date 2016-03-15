@@ -30,8 +30,12 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
+# Handles color information and application for the game.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
 module Color
   BLACK         = 30
   BLUE          = 34
@@ -94,7 +98,7 @@ module GameHelpers
   end
 end
 
-# Handles all keyboard input for the application.
+# Handles all keyboard input for the game.
 #
 # @author Muriel Salvan <http://blog.x-aeon.com/2014/03/26/how-to-read-one-non-blocking-key-press-in-ruby/>
 # @author James Edward Gray II <http://graysoftinc.com/terminal-tricks/random-access-terminal>
@@ -578,14 +582,14 @@ class Game
                           " "
                         end
 
-      @string  = "#{ @ceiling_sliver }," * [ @wall_top - 1, 0 ].max
-      @string += "#{ @wall_sliver },"    * ( @wall_bottom - @wall_top + 1 )
-      @string += "#{ @floor_sliver },"   * [ @screen_height - @wall_bottom, 0 ].max
+      @sliver  = "#{ @ceiling_sliver }," * [ @wall_top - 1, 0 ].max
+      @sliver += "#{ @wall_sliver },"    * ( @wall_bottom - @wall_top + 1 )
+      @sliver += "#{ @floor_sliver },"   * [ @screen_height - @wall_bottom, 0 ].max
 
-      @sliver = @string.split( "," )
+      @final_sliver = @sliver.split( "," )
 
       for y in 0...@screen_height
-        @buffer[ y ][ ray ] = @sliver[ y ]
+        @buffer[ y ][ ray ] = @final_sliver[ y ]
       end
 
       @view_angle = ( @view_angle + 1 ) % @angles[ 360 ]
@@ -871,7 +875,7 @@ class Game
     update_buffer
   end
 
-  # Displays the exit screen and quits the application.
+  # Displays the exit screen and quits the game.
   #
   def show_exit_screen
     clear_screen true
@@ -935,7 +939,7 @@ class Game
     update_buffer
   end
 
-  # Displays the application's title screen.
+  # Displays the game's title screen.
   #
   def show_title_screen
     clear_screen true
