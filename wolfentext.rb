@@ -179,7 +179,6 @@ class Game
   include GameInput
   include Math
 
-  CELL_MARGIN = 32
   MAP_EMPTY_CELL = "."
   WIPE_BLINDS = 1
   WIPE_PIXELIZE_IN = 2
@@ -214,18 +213,18 @@ class Game
   # Checks whether the player has collided with a wall.
   #
   def check_collisions
-    @x_cell = @player_x / @grid_width
-    @y_cell = @player_y / @grid_height
-    @x_sub_cell = @player_x % @grid_width
-    @y_sub_cell = @player_y % @grid_height
+    @x_cell = @player_x / @cell_width
+    @y_cell = @player_y / @cell_height
+    @x_sub_cell = @player_x % @cell_width
+    @y_sub_cell = @player_y % @cell_height
 
     if @move_x > 0
       # Player is moving right
       unless @map[ @y_cell ][ @x_cell + 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell + 1 ] == "E"
           show_end_screen
-        elsif @x_sub_cell > ( @grid_width - CELL_MARGIN )
-          @move_x -= @x_sub_cell - ( @grid_width - CELL_MARGIN )
+        elsif @x_sub_cell > ( @cell_width - @cell_margin )
+          @move_x -= @x_sub_cell - ( @cell_width - @cell_margin )
         end
       end
     else
@@ -233,8 +232,8 @@ class Game
       unless @map [ @y_cell ][ @x_cell - 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell - 1 ] == "E"
           show_end_screen
-        elsif @x_sub_cell < CELL_MARGIN
-          @move_x += CELL_MARGIN - @x_sub_cell
+        elsif @x_sub_cell < @cell_margin
+          @move_x += @cell_margin - @x_sub_cell
         end
       end
     end
@@ -244,8 +243,8 @@ class Game
       unless @map[ @y_cell + 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell + 1 ][ @x_cell ] == "E"
           show_end_screen
-        elsif @y_sub_cell > ( @grid_height - CELL_MARGIN )
-          @move_y -= @y_sub_cell - ( @grid_height - CELL_MARGIN )
+        elsif @y_sub_cell > ( @cell_height - @cell_margin )
+          @move_y -= @y_sub_cell - ( @cell_height - @cell_margin )
         end
       end
     else
@@ -253,8 +252,8 @@ class Game
       unless @map[ @y_cell - 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell - 1 ][ @x_cell ] == "E"
           show_end_screen
-        elsif @y_sub_cell < CELL_MARGIN
-          @move_y += CELL_MARGIN - @y_sub_cell
+        elsif @y_sub_cell < @cell_margin
+          @move_y += @cell_margin - @y_sub_cell
         end
       end
     end
@@ -452,15 +451,15 @@ class Game
       if @view_angle >= @angles[ 0 ] && @view_angle < @angles[ 180 ]
         # Upper half plane
         #
-        @y_bound = @grid_height + @grid_height * ( y_start / @grid_height )
-        @y_delta = @grid_height
+        @y_bound = @cell_height + @cell_height * ( y_start / @cell_height )
+        @y_delta = @cell_height
         @xi = @inv_tan_table[ @view_angle ] * ( @y_bound - y_start ) + x_start
         @next_y_cell = 0
       else
         # Lower half plane
         #
-        @y_bound = @grid_height * ( y_start / @grid_height )
-        @y_delta = -@grid_height
+        @y_bound = @cell_height * ( y_start / @cell_height )
+        @y_delta = -@cell_height
         @xi = @inv_tan_table[ @view_angle ] * ( @y_bound - y_start ) + x_start
         @next_y_cell = -1
       end
@@ -468,15 +467,15 @@ class Game
       if @view_angle < @angles[ 90 ] || @view_angle >= @angles[ 270 ]
         # Right half plane
         #
-        @x_bound = @grid_width + @grid_width * ( x_start / @grid_width )
-        @x_delta = @grid_width
+        @x_bound = @cell_width + @cell_width * ( x_start / @cell_width )
+        @x_delta = @cell_width
         @yi = @tan_table[ @view_angle ] * ( @x_bound - x_start ) + y_start
         @next_x_cell = 0
       else
         # Left half plane
         #
-        @x_bound = @grid_width * ( x_start / @grid_width )
-        @x_delta = -@grid_width
+        @x_bound = @cell_width * ( x_start / @cell_width )
+        @x_delta = -@cell_width
         @yi = @tan_table[ @view_angle ] * ( @x_bound - x_start ) + y_start
         @next_x_cell = -1
       end
@@ -503,8 +502,8 @@ class Game
             @x_dist = 1e+8
           end
 
-          @x_cell = ( ( @x_bound + @next_x_cell ) / @grid_width ).to_i
-          @y_cell = ( @yi.to_i / @grid_height ).to_i
+          @x_cell = ( ( @x_bound + @next_x_cell ) / @cell_width ).to_i
+          @y_cell = ( @yi.to_i / @cell_height ).to_i
           @hit_type = @map[ @y_cell ][ @x_cell ] rescue MAP_EMPTY_CELL
 
           if @hit_type != MAP_EMPTY_CELL
@@ -529,8 +528,8 @@ class Game
             @y_dist = 1e+8
           end
 
-          @x_cell = ( @xi.to_i / @grid_width ).to_i
-          @y_cell = ( ( @y_bound + @next_y_cell ) / @grid_height ).to_i
+          @x_cell = ( @xi.to_i / @cell_width ).to_i
+          @y_cell = ( ( @y_bound + @next_y_cell ) / @cell_height ).to_i
           @hit_type = @map[ @y_cell ][ @x_cell ] rescue MAP_EMPTY_CELL
 
           if @hit_type != MAP_EMPTY_CELL
@@ -678,14 +677,14 @@ class Game
     for y in 0...@map_rows
       if x = @map[ y ].find_index( 'M' )
         @map[ y ][ x ] = MAP_EMPTY_CELL
-        @magic_x = x * @grid_width + ( @grid_width / 2 )
-        @magic_y = y * @grid_height + ( @grid_height / 2 )
+        @magic_x = x * @cell_width + ( @cell_width / 2 )
+        @magic_y = y * @cell_height + ( @cell_height / 2 )
         @player_x = @starting_x
         @player_y = @starting_y
       elsif x = @map[ y ].find_index( 'P' )
         @map[ y ][ x ] = MAP_EMPTY_CELL
-        @starting_x = x * @grid_width + ( @grid_width / 2 )
-        @starting_y = y * @grid_height + ( @grid_height / 2 )
+        @starting_x = x * @cell_width + ( @cell_width / 2 )
+        @starting_y = y * @cell_height + ( @cell_height / 2 )
         @player_x = @starting_x
         @player_y = @starting_y
       end
@@ -725,15 +724,15 @@ class Game
       @inv_tan_table[ angle ] = 1.0 / tan( rad_angle )
 
       if angle >= @angles[ 0 ] && angle < @angles[ 180 ]
-        @y_step[ angle ] =  ( @tan_table[ angle ] * @grid_height ).abs
+        @y_step[ angle ] =  ( @tan_table[ angle ] * @cell_height ).abs
       else
-        @y_step[ angle ] = -( @tan_table[ angle ] * @grid_height ).abs
+        @y_step[ angle ] = -( @tan_table[ angle ] * @cell_height ).abs
       end
 
       if angle >= @angles[ 90 ] && angle < @angles[ 270 ]
-        @x_step[ angle ] = -( @inv_tan_table[ angle ] * @grid_width ).abs
+        @x_step[ angle ] = -( @inv_tan_table[ angle ] * @cell_width ).abs
       else
-        @x_step[ angle ] =  ( @inv_tan_table[ angle ] * @grid_width ).abs
+        @x_step[ angle ] =  ( @inv_tan_table[ angle ] * @cell_width ).abs
       end
     end
 
@@ -759,17 +758,18 @@ class Game
     @screen_width = 80
     @screen_height = 36
 
-    @grid_height = 64
-    @grid_width = 64
+    @cell_height = 64
+    @cell_width = 64
+    @cell_margin = 32
 
     @map_cols = 32
     @map_rows = 32
-    @map_x_size = @map_cols * @grid_width
-    @map_y_size = @map_rows * @grid_height
+    @map_x_size = @map_cols * @cell_width
+    @map_y_size = @map_rows * @cell_height
 
-    @starting_angle = 0
     @player_angle = 0
     @player_fov = 60
+    @starting_angle = 0
 
     @fixed_factor = 512
     @fixed_count = ( 360 * @screen_width ) / @player_fov
@@ -817,11 +817,11 @@ class Game
     puts
     puts "[ Metrics ]".center( @screen_width )
     puts
+    puts ( "cell_height".ljust( 25 )         + @cell_height.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "cell_width".ljust( 25 )          + @cell_width.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "frames_rendered".ljust( 25 )     + @frames_rendered.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "frame_rate".ljust( 25 )          + @frame_rate.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "frame_total_time".ljust( 25 )    + ( Time.now - @frame_start_time ).to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "grid_height".ljust( 25 )         + @grid_height.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "grid_width".ljust( 25 )          + @grid_width.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "play_count".ljust( 25 )          + @play_count.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_angle".ljust( 25 )        + ( @player_angle / @fixed_step ).to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_angle_raw".ljust( 25 )    + @player_angle.to_s.rjust( 25 ) ).center( @screen_width )
