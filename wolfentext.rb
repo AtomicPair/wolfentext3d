@@ -201,14 +201,35 @@ class Game
     while true
       check_input
       update_frame_rate
+      update_delta_time
       draw_debug_info if @display_debug_info
-      sleep 0.01
+      sleep 0.015
 
       @frames_rendered += 1
     end
   end
 
   private
+
+  ##############
+  # Attributes #
+  ##############
+
+  # Defines our time-independent step value for movement calculations.
+  #
+  def movement_step
+    ( 256 * @delta_time )
+  end
+
+  # Defines our time-independent step value for turning calculations.
+  #
+  def turn_step
+    ( @angles[ 90 ] * @delta_time )
+  end
+
+  ###########
+  # Methods #
+  ###########
 
   # Checks whether the player has collided with a wall.
   #
@@ -223,8 +244,8 @@ class Game
       unless @map[ @y_cell ][ @x_cell + 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell + 1 ] == "E"
           show_end_screen
-        elsif @x_sub_cell > ( @cell_width - @cell_margin )
-          @move_x -= @x_sub_cell - ( @cell_width - @cell_margin )
+        elsif @x_sub_cell >= ( @cell_width - @cell_margin )
+          @move_x = -( @x_sub_cell - ( @cell_width - @cell_margin ) )
         end
       end
     else
@@ -232,8 +253,8 @@ class Game
       unless @map [ @y_cell ][ @x_cell - 1 ] == MAP_EMPTY_CELL
         if @map[ @y_cell ][ @x_cell - 1 ] == "E"
           show_end_screen
-        elsif @x_sub_cell < @cell_margin
-          @move_x += @cell_margin - @x_sub_cell
+        elsif @x_sub_cell <= @cell_margin
+          @move_x = @cell_margin - @x_sub_cell
         end
       end
     end
@@ -243,8 +264,8 @@ class Game
       unless @map[ @y_cell + 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell + 1 ][ @x_cell ] == "E"
           show_end_screen
-        elsif @y_sub_cell > ( @cell_height - @cell_margin )
-          @move_y -= @y_sub_cell - ( @cell_height - @cell_margin )
+        elsif @y_sub_cell >= ( @cell_height - @cell_margin )
+          @move_y = -( @y_sub_cell - ( @cell_height - @cell_margin ) )
         end
       end
     else
@@ -252,8 +273,8 @@ class Game
       unless @map[ @y_cell - 1 ][ @x_cell ] == MAP_EMPTY_CELL
         if @map[ @y_cell - 1 ][ @x_cell ] == "E"
           show_end_screen
-        elsif @y_sub_cell < @cell_margin
-          @move_y += @cell_margin - @y_sub_cell
+        elsif @y_sub_cell <= @cell_margin
+          @move_y = @cell_margin - @y_sub_cell
         end
       end
     end
@@ -277,26 +298,26 @@ class Game
 
       # Up arrow
       when "\e[A", "\u00E0H", "w"
-        @move_x = ( @cos_table[ @player_angle ] * 4 ).round
-        @move_y = ( @sin_table[ @player_angle ] * 4 ).round
+        @move_x = ( @cos_table[ @player_angle ] * movement_step ).round
+        @move_y = ( @sin_table[ @player_angle ] * movement_step ).round
         check_collisions
         update_buffer
 
       # Down arrow
       when "\e[B", "\u00E0P", "s"
-        @move_x = -( @cos_table[ @player_angle ] * 4 ).round
-        @move_y = -( @sin_table[ @player_angle ] * 4 ).round
+        @move_x = -( @cos_table[ @player_angle ] * movement_step ).round
+        @move_y = -( @sin_table[ @player_angle ] * movement_step ).round
         check_collisions
         update_buffer
 
       # Right arrow
       when "\e[C", "\u00E0M", "l"
-        @player_angle = ( @player_angle + @angles[ 2 ] ) % @angles[ 360 ]
+        @player_angle = ( @player_angle + turn_step ) % @angles[ 360 ]
         update_buffer
 
       # Left arrow
       when "\e[D", "\u00E0K", "k"
-        @player_angle = ( @player_angle - @angles[ 2 ] + @angles[ 360 ] ) % @angles[ 360 ]
+        @player_angle = ( @player_angle - turn_step + @angles[ 360 ] ) % @angles[ 360 ]
         update_buffer
 
       # Ctrl-C
@@ -305,6 +326,20 @@ class Game
 
       when "1", "2", "3"
         @color_mode = key.to_i
+        update_buffer
+
+      when "a"
+        # Player is attempting to strafe left
+        @move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        @move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        check_collisions
+        update_buffer
+
+      when "d"
+        # Player is attempting to strafe right
+        @move_x = ( @cos_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        @move_y = ( @sin_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        check_collisions
         update_buffer
 
       when "c"
@@ -324,18 +359,6 @@ class Game
       when "i"
         @display_debug_info = !@display_debug_info
         clear_screen true
-        update_buffer
-
-      when "a"
-        @move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
-        @move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
-        check_collisions
-        update_buffer
-
-      when "d"
-        @move_x = ( @cos_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
-        @move_y = ( @sin_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
-        check_collisions
         update_buffer
 
       when "m"
@@ -377,8 +400,8 @@ class Game
   # Draws extra information onto HUD.
   #
   def draw_debug_info
-    STDOUT.write "\e[1;#{ @screen_width - 10 }H"
-    STDOUT.write " #{ '%.2f' % @frame_rate } fps "
+    STDOUT.write "\e[1;#{ @screen_width - 19 }H"
+    STDOUT.write "#{ @delta_time.round( 4) } δ | #{ '%.2f' % @frame_rate } fps "
   end
 
   # Applies the selected screen wipe/transition to the active buffer.
@@ -793,6 +816,9 @@ class Game
     @fixed_count = ( 360 * @screen_width ) / @player_fov
     @fixed_step = @fixed_count / 360.0
 
+    @delta_start_time = 0.0
+    @delta_time = 0.0
+
     @frames_rendered = 0
     @frame_rate = 0.0
     @frame_start_time = 0.0
@@ -1017,6 +1043,15 @@ class Game
     clear_screen
     draw_buffer
     draw_status_line
+  end
+
+  # Updates the current delta time factor, which we apply to all time-based
+  # calculations (like object movement, animations, etc.) to acheive the same
+  # amount of movement across different frame rates and environments.
+  #
+  def update_delta_time
+    @delta_time = Time.now - @delta_start_time
+    @delta_start_time = Time.now
   end
 
   # Updates the current frame rate metric.
