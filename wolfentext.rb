@@ -290,12 +290,12 @@ class Game
         update_buffer
 
       # Right arrow
-      when "\e[C", "\u00E0M", "d"
+      when "\e[C", "\u00E0M", "l"
         @player_angle = ( @player_angle + @angles[ 2 ] ) % @angles[ 360 ]
         update_buffer
 
       # Left arrow
-      when "\e[D", "\u00E0K", "a"
+      when "\e[D", "\u00E0K", "k"
         @player_angle = ( @player_angle - @angles[ 2 ] + @angles[ 360 ] ) % @angles[ 360 ]
         update_buffer
 
@@ -324,6 +324,18 @@ class Game
       when "i"
         @display_debug_info = !@display_debug_info
         clear_screen true
+        update_buffer
+
+      when "a"
+        @move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
+        @move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
+        check_collisions
+        update_buffer
+
+      when "d"
+        @move_x = ( @cos_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
+        @move_y = ( @sin_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * 4 ).round
+        check_collisions
         update_buffer
 
       when "m"
@@ -769,7 +781,13 @@ class Game
 
     @player_angle = 0
     @player_fov = 60
+
     @starting_angle = 0
+    @starting_x = 0
+    @starting_y = 0
+
+    @move_x = 0
+    @move_y = 0
 
     @fixed_factor = 512
     @fixed_count = ( 360 * @screen_width ) / @player_fov
@@ -914,10 +932,12 @@ class Game
     puts
     puts "[ Keys ]".center( @screen_width )
     puts
-    puts ( "Move forward".ljust( 25 )   + "W, Up Arrow".rjust( 25 ) ).center( @screen_width )
-    puts ( "Move backward".ljust( 25 )  + "S, Down Arrow".rjust( 25 ) ).center( @screen_width )
-    puts ( "Turn left".ljust( 25 )      + "A, Left Arrow".rjust( 25 ) ).center( @screen_width )
-    puts ( "Turn right".ljust( 25 )     + "D, Right Arrow".rjust( 25 ) ).center( @screen_width )
+    puts ( "Move forward".ljust( 25 )   + "Up Arrow, W".rjust( 25 ) ).center( @screen_width )
+    puts ( "Move backward".ljust( 25 )  + "Down Arrow, S".rjust( 25 ) ).center( @screen_width )
+    puts ( "Strafe left".ljust( 25 )    + "A".rjust( 25 ) ).center( @screen_width )
+    puts ( "Strafe right".ljust( 25 )   + "D".rjust( 25 ) ).center( @screen_width )
+    puts ( "Turn left".ljust( 25 )      + "Left Arrow, K".rjust( 25 ) ).center( @screen_width )
+    puts ( "Turn right".ljust( 25 )     + "Right Arrow, L".rjust( 25 ) ).center( @screen_width )
     puts
     puts ( "Toggle ceiling".ljust( 25 )    + "C".rjust( 25 ) ).center( @screen_width )
     puts ( "Toggle debug info".ljust( 25 ) + "I".rjust( 25 ) ).center( @screen_width )
