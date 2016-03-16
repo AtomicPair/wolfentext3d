@@ -33,10 +33,13 @@ Wolfentext3D is a simple take on a classic game with the following goals:
 
 * Lean and mean: all code should be contained in a single source file.
 * Cross-platform: it should work reasonably well across Linux, Mac, and yes, even Windows.
+* Instructive: the code should be clean, readable, and easy to follow.
 * No external dependencies, other than the Ruby core and standard libraries.
 * No bitmap graphics: everything uses ASCII art and terminal colors!
 
-Wolfentext is proudly (if not somewhat arbitrarily) written in pure Ruby.  Where possible, documentation is provided by code comments using the popular YARD documentation format.
+Wolfentext is proudly (if not somewhat arbitrarily) written in pure Ruby.
+
+Documentation may be derived from the code using the popular YARD documentation format.
 
 Features
 ========
@@ -44,8 +47,8 @@ Features
 Here are the features currently supported in Wolfentext:
 
 * Solid orthogonal walls
-* Floor colors and "textures"
-* Ceiling colors and "textures"
+* Floor colors and pseudo-textures
+* Ceiling colors and pseudo-textures
 * Collision detection with wall sliding
 * Title, help, debug, and ending screens
 * 16 colors of super-pixelated eye candy!
@@ -86,17 +89,22 @@ $ cd wolfentext
 $ ruby wolfentext.rb
 ```
 
-Notes
-=====
+Issues
+======
 
 Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some known issues with the game of which you should be aware:
 
-* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, achieving framerates up to 60 fps.  However, Windows users may notice **significant** performance issues when using *any* color mode in the native Comand Prompt or Powershell terminals.  Other third-party terminals may yield better performance but have not yet been tested.
+* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, achieving frame rates up to 60 fps.  However, Windows users may notice **significant** performance issues when using *any* color mode in the native Command Prompt or PowerShell terminals.  Other third-party terminals may yield better performance but have not yet been tested.
 * *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release, assuming we can find a sensible cross-platform method that works.
 * *Terminal*: At present, the code assumes you are running this script in a compatible terminal.  Logic should be added that detects not only the current terminal upon program start, but also what features are presently available to that terminal and whether they are compatible with the current version of Wolfentext.
-* *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further graphical optimizations for Windows users, (2) further refinement to the ray casting lookup tables, and (3) better memory profiling to identify and reduce overall resource allocations.
+* *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further graphical optimizations for Windows users, (2) further refinement to the ray casting lookup tables, and (3) better memory profiling to identify and reduce overall resource allocations.  Other areas of opportunity may also exist which have not yet been identified.
 
-Any thoughts or suggestions for solving these problems -- including pull requests -- are always welcome!
+Any thoughts or suggestions for solving these issues -- including pull requests -- are always welcome!
+
+History
+=======
+
+Wolfentext was originally born from the need to share a code sample with a potential recruiter.  The sample had to be contained within a single file, and since I didn't have any public samples available at the time that I felt comfortable sharing, I spent the next few days creating the first iteration of Wolfentext from scratch.  Since then, the script has taken on a life of it's own: adding new features, fixing bugs, and morphing into an homage to the classic 2.5D shooters from the days of my youth.
 
 Support
 =======
