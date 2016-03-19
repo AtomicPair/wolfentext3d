@@ -47,6 +47,7 @@ Features
 Here are the features currently supported in Wolfentext:
 
 * Solid orthogonal walls
+* Recessed sliding doors
 * Floor colors and pseudo-textures
 * Ceiling colors and pseudo-textures
 * Collision detection with wall sliding
@@ -55,9 +56,8 @@ Here are the features currently supported in Wolfentext:
 
 ...and here are some **missing** features that are in the works:
 
-* Wall textures
-* Sliding doors
 * Secret walls
+* Wall textures
 * Stationary and usable objects
 * Enemies and other entities
 * Sounds or music
