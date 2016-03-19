@@ -30,7 +30,7 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 
 # Handles color information and application for the game.
 #
@@ -104,7 +104,7 @@ end
 # @author James Edward Gray II <http://graysoftinc.com/terminal-tricks/random-access-terminal>
 # @author Adam Parrott <parrott.adam@gmail.com>
 #
-module GameInput
+module Input
   require 'io/console'
   require 'io/wait'
 
@@ -123,50 +123,50 @@ module GameInput
 
   # Clears the current input buffer of any data.
   #
-  def clear_input
+  def self.clear_input
     STDIN.ioflush
     self.get_key
   end
 
-  # Waits for and returns the first character entered by a user.
-  #
-  def wait_key
-    if WINDOWS_INPUT
-      input = WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
-
-      if input == "\u00E0"
-        input << WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
-      end
-    else
-      input = STDIN.getc.chr
-    end
-
-    return input
-  end
-
   # Returns the first key found in the current input buffer.
   #
-  def get_key
+  def self.get_key
     if WINDOWS_INPUT
       if WINDOWS_KB_HIT.Call.zero?
-        input = nil
+        @input = nil
       else
-        input = WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
+        @input = WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
 
-        if input == "\u00E0"
-          input << WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
+        if @input == "\u00E0"
+          @input << WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
         end
       end
     else
-      input = STDIN.read_nonblock( 1 ).chr rescue nil
+      @input = STDIN.read_nonblock( 1 ).chr rescue nil
 
-      if input == "\e"
-        input << STDIN.read_nonblock( 3 ) rescue nil
-        input << STDIN.read_nonblock( 2 ) rescue nil
+      if @input == "\e"
+        @input << STDIN.read_nonblock( 3 ) rescue nil
+        @input << STDIN.read_nonblock( 2 ) rescue nil
       end
     end
 
-    return input
+    return @input
+  end
+
+  # Waits for and returns the first character entered by a user.
+  #
+  def self.wait_key
+    if WINDOWS_INPUT
+      @input = WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
+
+      if @input == "\u00E0"
+        @input << WINDOWS_GET_CHAR.Call.chr( Encoding::UTF_8 )
+      end
+    else
+      @input = STDIN.getc.chr
+    end
+
+    return @input
   end
 end
 
@@ -176,12 +176,22 @@ end
 #
 class Game
   include GameHelpers
-  include GameInput
   include Math
 
+  DOOR_CLOSED  = 1
+  DOOR_OPENING = 2
+  DOOR_OPEN    = 3
+  DOOR_CLOSING = 4
+
+  MAP_END_CELL = "E"
   MAP_EMPTY_CELL = "."
-  WIPE_BLINDS = 1
-  WIPE_PIXELIZE_IN = 2
+  MAP_DOOR_CELL = "D"
+  MAP_DOOR_CELLS = %w( - | )
+  MAP_MAGIC_CELL = "M"
+  MAP_PLAYER_CELL = "P"
+
+  WIPE_BLINDS       = 1
+  WIPE_PIXELIZE_IN  = 2
   WIPE_PIXELIZE_OUT = 3
 
   def initialize
@@ -200,12 +210,12 @@ class Game
 
     while true
       check_input
+      update_buffer
+      update_doors
       update_frame_rate
       update_delta_time
       draw_debug_info if @display_debug_info
       sleep 0.015
-
-      @frames_rendered += 1
     end
   end
 
@@ -218,7 +228,7 @@ class Game
   # Defines our time-independent step value for movement calculations.
   #
   def movement_step
-    ( 256 * @delta_time )
+    ( 160 * @delta_time )
   end
 
   # Defines our time-independent step value for turning calculations.
@@ -241,18 +251,24 @@ class Game
 
     if @move_x > 0
       # Player is moving right
-      unless @map[ @y_cell ][ @x_cell + 1 ] == MAP_EMPTY_CELL
-        if @map[ @y_cell ][ @x_cell + 1 ] == "E"
+      unless @map[ @y_cell ][ @x_cell + 1 ][ :value ] == MAP_EMPTY_CELL
+        if @map[ @y_cell ][ @x_cell + 1 ][ :value ] == MAP_END_CELL
           show_end_screen
+        elsif @map[ @y_cell ][ @x_cell + 1 ][ :value ] == MAP_DOOR_CELL &&
+              @map[ @y_cell ][ @x_cell + 1 ][ :state ] == DOOR_OPEN
+          # Let the player pass through the open door
         elsif @x_sub_cell >= ( @cell_width - @cell_margin )
           @move_x = -( @x_sub_cell - ( @cell_width - @cell_margin ) )
         end
       end
     else
       # Player is moving left
-      unless @map [ @y_cell ][ @x_cell - 1 ] == MAP_EMPTY_CELL
-        if @map[ @y_cell ][ @x_cell - 1 ] == "E"
+      unless @map [ @y_cell ][ @x_cell - 1 ][ :value ] == MAP_EMPTY_CELL
+        if @map[ @y_cell ][ @x_cell - 1 ][ :value ] == MAP_END_CELL
           show_end_screen
+        elsif @map[ @y_cell ][ @x_cell - 1 ][ :value ] == MAP_DOOR_CELL &&
+              @map[ @y_cell ][ @x_cell - 1 ][ :state ] == DOOR_OPEN
+          # Let the player pass through the open door
         elsif @x_sub_cell <= @cell_margin
           @move_x = @cell_margin - @x_sub_cell
         end
@@ -261,18 +277,24 @@ class Game
 
     if @move_y > 0
       # Player is moving up
-      unless @map[ @y_cell + 1 ][ @x_cell ] == MAP_EMPTY_CELL
-        if @map[ @y_cell + 1 ][ @x_cell ] == "E"
+      unless @map[ @y_cell + 1 ][ @x_cell ][ :value ] == MAP_EMPTY_CELL
+        if @map[ @y_cell + 1 ][ @x_cell ][ :value ] == MAP_END_CELL
           show_end_screen
+        elsif @map[ @y_cell + 1 ][ @x_cell ][ :value ] == MAP_DOOR_CELL &&
+              @map[ @y_cell + 1 ][ @x_cell ][ :state ] == DOOR_OPEN
+          # Let the player pass through the open door
         elsif @y_sub_cell >= ( @cell_height - @cell_margin )
           @move_y = -( @y_sub_cell - ( @cell_height - @cell_margin ) )
         end
       end
     else
       # Player is moving down
-      unless @map[ @y_cell - 1 ][ @x_cell ] == MAP_EMPTY_CELL
-        if @map[ @y_cell - 1 ][ @x_cell ] == "E"
+      unless @map[ @y_cell - 1 ][ @x_cell ][ :value ] == MAP_EMPTY_CELL
+        if @map[ @y_cell - 1 ][ @x_cell ][ :value ] == MAP_END_CELL
           show_end_screen
+        elsif @map[ @y_cell - 1 ][ @x_cell ][ :value ] == MAP_DOOR_CELL &&
+              @map[ @y_cell - 1 ][ @x_cell ][ :state ] == DOOR_OPEN
+          # Let the player pass through the open door
         elsif @y_sub_cell <= @cell_margin
           @move_y = @cell_margin - @y_sub_cell
         end
@@ -288,7 +310,7 @@ class Game
   # @see https://gist.github.com/acook/4190379
   #
   def check_input
-    key = get_key
+    key = Input.get_key
 
     return if key.nil?
 
@@ -301,57 +323,63 @@ class Game
         @move_x = ( @cos_table[ @player_angle ] * movement_step ).round
         @move_y = ( @sin_table[ @player_angle ] * movement_step ).round
         check_collisions
-        update_buffer
 
       # Down arrow
       when "\e[B", "\u00E0P", "s"
         @move_x = -( @cos_table[ @player_angle ] * movement_step ).round
         @move_y = -( @sin_table[ @player_angle ] * movement_step ).round
         check_collisions
-        update_buffer
 
       # Right arrow
       when "\e[C", "\u00E0M", "l"
         @player_angle = ( @player_angle + turn_step ) % @angles[ 360 ]
-        update_buffer
 
       # Left arrow
       when "\e[D", "\u00E0K", "k"
         @player_angle = ( @player_angle - turn_step + @angles[ 360 ] ) % @angles[ 360 ]
-        update_buffer
 
       # Ctrl-C
       when "\u0003"
         exit 0
 
+      when " "
+        @move_x = ( @cos_table[ @player_angle ] * @cell_width ).round
+        @move_y = ( @sin_table[ @player_angle ] * @cell_height ).round
+        @x_cell = ( @player_x + @move_x ) / @cell_width
+        @y_cell = ( @player_y + @move_y ) / @cell_height
+
+        if @map[ @y_cell ][ @x_cell ][ :value ] == MAP_DOOR_CELL
+          case @map[ @y_cell ][ @x_cell ][ :state ]
+          when DOOR_CLOSED
+            @map[ @y_cell ][ @x_cell ][ :state ] = DOOR_OPENING
+          when DOOR_OPEN
+            @map[ @y_cell ][ @x_cell ][ :state ] = DOOR_CLOSING
+          end
+        end
+
       when "1", "2", "3"
         @color_mode = key.to_i
-        update_buffer
 
       when "a"
         # Player is attempting to strafe left
         @move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
         @move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
         check_collisions
-        update_buffer
 
       when "d"
         # Player is attempting to strafe right
         @move_x = ( @cos_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
         @move_y = ( @sin_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
         check_collisions
-        update_buffer
 
       when "c"
         @draw_ceiling = !@draw_ceiling
-        update_buffer
 
       when "?"
         show_debug_screen
 
       when "f"
         @draw_floor = !@draw_floor
-        update_buffer
 
       when "h"
         show_help_screen
@@ -359,7 +387,6 @@ class Game
       when "i"
         @display_debug_info = !@display_debug_info
         clear_screen true
-        update_buffer
 
       when "m"
         draw_screen_wipe WIPE_PIXELIZE_IN
@@ -400,8 +427,8 @@ class Game
   # Draws extra information onto HUD.
   #
   def draw_debug_info
-    STDOUT.write "\e[1;#{ @screen_width - 19 }H"
-    STDOUT.write "#{ @delta_time.round( 4) } δ | #{ '%.2f' % @frame_rate } fps "
+    STDOUT.write "\e[1;#{ @screen_width - 9 }H"
+    STDOUT.write "#{ '%.2f' % @frame_rate } fps "
   end
 
   # Applies the selected screen wipe/transition to the active buffer.
@@ -465,6 +492,12 @@ class Game
     @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }°".ljust( 18 )
 
     puts @status_left + @status_middle + @status_right
+  end
+
+  # Positions the cursor to the specified row and column.
+  #
+  def position_cursor( row, column )
+    STDOUT.write "\e[#{ row };#{ column }H"
   end
 
   # Our ray casting engine, AKA The Big Kahuna(TM).
@@ -539,11 +572,17 @@ class Game
 
           @x_cell = ( ( @x_bound + @next_x_cell ) / @cell_width ).to_i
           @y_cell = ( @yi.to_i / @cell_height ).to_i
-          @hit_type = @map[ @y_cell ][ @x_cell ] rescue MAP_EMPTY_CELL
+          @x_map_cell = @map[ @y_cell ][ @x_cell ] rescue nil
+          @hit_type = @x_map_cell[ :value ] rescue MAP_EMPTY_CELL
 
-          if @hit_type != MAP_EMPTY_CELL
+          if @hit_type == MAP_EMPTY_CELL
+            @yi += @y_step[ @view_angle ]
+          elsif @hit_type == MAP_DOOR_CELL && @x_map_cell[ :offset ] > ( @yi % 64 )
+            @yi += @y_step[ @view_angle ]
+          else
+            @yi += ( @y_step[ @view_angle ] / 2 ) if @hit_type == MAP_DOOR_CELL
             @x_dist = ( @yi - y_start ) * @inv_sin_table[ @view_angle ]
-            @x_map = @map[ @y_cell ][ @x_cell ]
+            @x_map = @x_map_cell[ :value ]
             @yi_save = @yi
             @xb_save = @x_bound
             @x_x_save = @x_cell
@@ -551,8 +590,6 @@ class Game
 
             @x_ray = true
             @casting -= 1
-          else
-            @yi += @y_step[ @view_angle ]
           end
         end
 
@@ -565,11 +602,17 @@ class Game
 
           @x_cell = ( @xi.to_i / @cell_width ).to_i
           @y_cell = ( ( @y_bound + @next_y_cell ) / @cell_height ).to_i
-          @hit_type = @map[ @y_cell ][ @x_cell ] rescue MAP_EMPTY_CELL
+          @y_map_cell = @map[ @y_cell ][ @x_cell ] rescue nil
+          @hit_type = @y_map_cell[ :value ] rescue MAP_EMPTY_CELL
 
-          if @hit_type != MAP_EMPTY_CELL
+          if @hit_type == MAP_EMPTY_CELL
+            @xi += @x_step[ @view_angle ]
+          elsif @hit_type == MAP_DOOR_CELL && @y_map_cell[ :offset ] > ( @xi % 64 )
+            @xi += @x_step[ @view_angle ]
+          else
+            @xi += ( @x_step[ @view_angle ] / 2 ) if @hit_type == MAP_DOOR_CELL
             @y_dist = ( @xi - x_start ) * @inv_cos_table[ @view_angle ]
-            @y_map = @map[ @y_cell ][ @x_cell ]
+            @y_map = @y_map_cell[ :value ]
             @xi_save = @xi
             @yb_save = @y_bound
             @y_x_save = @x_cell
@@ -577,8 +620,6 @@ class Game
 
             @y_ray = true
             @casting -= 1
-          else
-            @xi += @x_step[ @view_angle ]
           end
         end
 
@@ -587,22 +628,24 @@ class Game
       end
 
       if @x_dist < @y_dist
+        @dist = @x_dist
         @map_type = @x_map
         @map_x = @x_x_save
         @map_y = @x_y_save
-        @scale = @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @x_dist ) )
+        @scale = ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @x_dist ) ) ).round
       else
+        @dist = @y_dist
         @map_type = @y_map
         @map_x = @y_x_save
         @map_y = @y_y_save
-        @scale = @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @y_dist ) )
+        @scale = ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @y_dist ) ) ).round
       end
 
       @wall_scale = ( @scale / 2 ).to_i
       @wall_top = ( @screen_height / 2 ) - @wall_scale
       @wall_bottom = ( @screen_height / 2 ) + @wall_scale
       @wall_color = @wall_colors[ @map_type ]
-      @wall_texture = ( 32 + @map_type.to_i ).chr
+      @wall_texture = @map_type
       @wall_sliver = Color.colorize( @wall_texture, @wall_color, @color_mode )
 
       @ceiling_sliver = if @draw_ceiling
@@ -675,55 +718,64 @@ class Game
     @map = \
     [
       %w( 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 ),
-      %w( 2 P . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
-      %w( 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
-      %w( 2 . . 2 1 1 1 1 1 1 1 1 2 . 2 1 1 1 1 1 1 1 2 . 2 1 1 1 2 . . 2 ),
-      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
-      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
-      %w( 2 . . 1 . . 3 4 4 4 4 4 4 4 4 3 . 3 4 4 4 4 4 4 4 3 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . 6 5 5 5 5 5 5 6 . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . . . . . . . . 5 . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . 6 5 5 5 5 5 5 5 . . 3 . . 4 . . 2 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . 5 . . . . . . 5 . . 3 . . 4 . . . . . 2 ),
-      %w( 2 . . 2 . . 4 . . 3 . . 5 . . . . . . 5 . . 3 . . 4 . . . . . 2 ),
-      %w( 2 . . . . . 4 . . 3 . . 5 . . . . . . 5 . . 3 . . 4 . . 2 . . 2 ),
-      %w( 2 . . 2 . . 4 . . 3 . . 5 5 5 5 5 5 5 6 . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . 5 E . . . . . . . M 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 3 . . 6 5 5 5 5 5 5 6 . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 4 . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . 3 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . 4 3 3 3 3 3 3 3 3 3 3 3 3 4 . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 4 . . . . . . . . . . . . . . . . . . 4 . . 1 . . 2 ),
-      %w( 2 . . 1 . . 3 . 3 4 4 4 4 4 4 4 4 4 4 4 4 4 4 3 . 3 . . 1 . . 2 ),
-      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
-      %w( 2 . . 1 . . . . . . . . . . . . . . . . . . . . . . . . 1 . . 2 ),
-      %w( 2 . . 2 1 1 1 1 1 1 1 1 1 1 2 . 2 1 1 1 1 1 1 1 1 1 2 . 2 . . 2 ),
-      %w( 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
-      %w( 2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2 ),
+      %w( 1 P . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
+      %w( 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
+      %w( 1 . . 2 2 2 2 2 - 2 2 2 2 2 2 2 2 2 2 2 2 2 2 - 2 2 2 2 2 . . 1 ),
+      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
+      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 3 3 3 3 3 3 3 3 3 - 3 3 3 3 3 3 3 3 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 4 4 4 4 4 4 4 4 4 4 4 4 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . 6 5 5 5 5 5 5 5 . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . 5 . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . 6 5 5 5 5 5 6 5 . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . | . . 3 . . 4 . . 5 . . . . 5 . 5 . . 4 . . 3 . . | . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . 5 . . . . 5 . 5 . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . 5 5 5 5 5 5 5 6 . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . 5 E . . . . . . . M 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . 5 5 5 5 5 5 5 6 . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . | . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . 4 4 4 4 4 4 4 4 4 4 4 4 4 4 . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . 3 - 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 - 3 . . 2 . . 1 ),
+      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
+      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
+      %w( 1 . . 2 2 2 2 2 2 2 2 2 2 2 2 - 2 2 2 2 2 2 2 2 2 2 2 2 2 . . 1 ),
+      %w( 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
+      %w( 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
       %w( 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 )
     ]
 
     for y in 0...@map_rows
-      if x = @map[ y ].find_index( 'M' )
-        @map[ y ][ x ] = MAP_EMPTY_CELL
-        @magic_x = x * @cell_width + ( @cell_width / 2 )
-        @magic_y = y * @cell_height + ( @cell_height / 2 )
-        @player_x = @starting_x
-        @player_y = @starting_y
-      elsif x = @map[ y ].find_index( 'P' )
-        @map[ y ][ x ] = MAP_EMPTY_CELL
-        @starting_x = x * @cell_width + ( @cell_width / 2 )
-        @starting_y = y * @cell_height + ( @cell_height / 2 )
-        @player_x = @starting_x
-        @player_y = @starting_y
+      for x in 0...@map_columns
+        if MAP_DOOR_CELLS.include? @map[ y ][ x ]
+          @map[ y ][ x ] = {
+            value: MAP_DOOR_CELL,
+            offset: 0,
+            state: DOOR_CLOSED
+          }
+        elsif @map[ y ][ x ] == MAP_MAGIC_CELL
+          @map[ y ][ x ] = { value: MAP_EMPTY_CELL }
+          @magic_x = x * @cell_width + ( @cell_width / 2 )
+          @magic_y = y * @cell_height + ( @cell_height / 2 )
+        elsif @map[ y ][ x ] == MAP_PLAYER_CELL
+          @map[ y ][ x ] = { value: MAP_EMPTY_CELL }
+          @starting_x = x * @cell_width + ( @cell_width / 2 )
+          @starting_y = y * @cell_height + ( @cell_height / 2 )
+        else
+          @map[ y ][ x ] = { value: @map[ y ][ x ] }
+        end
       end
     end
+
+    @player_angle = @starting_angle
+    @player_x = @starting_x
+    @player_y = @starting_y
   end
 
   # Configures all precalculated lookup tables.
@@ -744,6 +796,8 @@ class Game
     for i in 0..360
       @angles[ i ] = ( i * @fixed_step ).round
     end
+
+    @starting_angle = @angles[ @starting_angle ]
 
     # Configure our trigonometric lookup tables, because math is good.
     #
@@ -771,9 +825,11 @@ class Game
       end
     end
 
-    for angle in -@angles[ 30 ]..@angles[ 30 ]
+    half_fov = @player_fov / 2
+
+    for angle in -@angles[ half_fov ]..@angles[ half_fov ]
       rad_angle = ( 3.272e-4 ) + angle * 2 * 3.141592654 / @angles[ 360 ]
-      @fish_eye_table[ angle + @angles[ 30 ] ] = 1.0 / cos( rad_angle )
+      @fish_eye_table[ angle + @angles[ half_fov ] ] = 1.0 / cos( rad_angle )
     end
 
     # Configure some basic lookup tables for our wall colors.
@@ -784,7 +840,17 @@ class Game
     @wall_colors[ '4' ] = Color::LIGHT_GREEN
     @wall_colors[ '5' ] = Color::YELLOW
     @wall_colors[ '6' ] = Color::LIGHT_YELLOW
+    @wall_colors[ 'D' ] = Color::MAGENTA
     @wall_colors[ 'E' ] = Color::BLACK
+
+    # Configure our snarky HUD messages to the player.
+    #
+    @hud_messages =
+    [
+      "FIND THE EXIT!",
+      "HAHA! LET'S DO IT AGAIN!",
+      "ARE WE HAVING FUN YET?"
+    ]
   end
 
   # Configures all application variables.
@@ -793,17 +859,21 @@ class Game
     @screen_width = 80
     @screen_height = 36
 
+    @buffer = Array.new( @screen_height ) { Array.new( @screen_width ) }
+
     @cell_height = 64
     @cell_width = 64
     @cell_margin = 32
 
-    @map_cols = 32
+    @map_columns = 32
     @map_rows = 32
-    @map_x_size = @map_cols * @cell_width
+    @map_x_size = @map_columns * @cell_width
     @map_y_size = @map_rows * @cell_height
 
     @player_angle = 0
-    @player_fov = 60
+    @player_fov = 64
+    @player_x = 0
+    @player_y = 0
 
     @starting_angle = 0
     @starting_x = 0
@@ -822,25 +892,16 @@ class Game
     @frames_rendered = 0
     @frame_rate = 0.0
     @frame_start_time = 0.0
-    @play_count = 0
-
-    @color_mode = Color::MODE_NONE
-    @draw_ceiling = true
-    @draw_floor = true
 
     @ceiling_texture = "%"
     @floor_texture = "-"
     @wall_texture = "#"
 
+    @color_mode = Color::MODE_NONE
     @display_debug_info = false
-    @hud_messages =
-    [
-      "FIND THE EXIT!",
-      "HAHA! LET'S DO IT AGAIN!",
-      "ARE WE HAVING FUN YET?"
-    ]
-
-    @buffer = Array.new( @screen_height ) { Array.new( @screen_width ) }
+    @draw_ceiling = true
+    @draw_floor = true
+    @play_count = 0
   end
 
   # Displays the game's debug screen, waiting for the user to
@@ -872,7 +933,7 @@ class Game
     puts ( "player_fov".ljust( 25 )          + @player_fov.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_x".ljust( 25 )            + @player_x.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_y".ljust( 25 )            + @player_y.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "map_columns".ljust( 25 )         + @map_cols.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "map_columns".ljust( 25 )         + @map_columns.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "map_rows".ljust( 25 )            + @map_rows.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "map_x_size".ljust( 25 )          + @map_x_size.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "map_y_size".ljust( 25 )          + @map_y_size.to_s.rjust( 25 ) ).center( @screen_width )
@@ -882,7 +943,7 @@ class Game
     puts "Press any key to continue...".center( @screen_width )
     puts
 
-    wait_key
+    Input.wait_key
     clear_screen true
     update_buffer
   end
@@ -893,7 +954,8 @@ class Game
     draw_screen_wipe WIPE_BLINDS
     clear_screen true
 
-    puts $/ * ( ( @screen_height / 2 ) - 7 )
+    position_cursor ( @screen_height / 2 ) - 7, 0
+
     puts "You have reached...".center( 72 )
     puts "                ,,                                                  ,,  "
     puts " MMP''MM''YMM `7MM                    `7MM'''YMM                  `7MM  "
@@ -907,10 +969,9 @@ class Game
     puts "...or have you?".center( 72 )
     puts
     puts "Press any key to find out!".center( 72 )
-    puts $/ * ( ( @screen_height / 2 ) - 7 )
 
-    clear_input
-    wait_key
+    Input.clear_input
+    Input.wait_key
 
     @play_count += 1
 
@@ -980,7 +1041,7 @@ class Game
     puts "Press any key to continue...".center( @screen_width )
     puts
 
-    wait_key
+    Input.wait_key
     clear_screen true
     update_buffer
   end
@@ -996,7 +1057,7 @@ class Game
     puts
     puts "Press any key to start...".center( 88 )
 
-    wait_key
+    Input.wait_key
     clear_screen true
   end
 
@@ -1054,9 +1115,46 @@ class Game
     @delta_start_time = Time.now
   end
 
+  # Check state and update position of all active doors.
+  #
+  def update_doors
+    for y in 0...@map_rows
+      for x in 0...@map_columns
+        cell = @map[ y ][ x ]
+
+        if cell[ :value ] == MAP_DOOR_CELL
+          case cell[ :state ]
+          when DOOR_CLOSED
+            next
+          when DOOR_OPENING
+            if cell[ :offset ] >= @cell_width
+              cell[ :state ] = DOOR_OPEN
+              cell[ :open_since ] = Time.now
+            else
+              cell[ :offset ] += ( 32 * @delta_time )
+            end
+          when DOOR_OPEN
+            if ( Time.now - cell[ :open_since ] ) > 5.0
+              cell[ :state ] = DOOR_CLOSING
+              cell[ :open_since ] = 0.0
+            end
+          when DOOR_CLOSING
+            if cell[ :offset ] <= 0
+              cell[ :state ] = DOOR_CLOSED
+            else
+              cell[ :offset ] -= ( 32 * @delta_time )
+            end
+          end
+        end
+      end
+    end
+  end
+
   # Updates the current frame rate metric.
   #
   def update_frame_rate
+    @frames_rendered += 1
+
     if ( Time.now - @frame_start_time ) >= 1.0
       @frame_rate = ( @frames_rendered / ( Time.now - @frame_start_time ) ).round( 2 )
       @frames_rendered = 0
