@@ -415,13 +415,44 @@ class Game
   #
   def clear_screen( full = false )
     puts "\e[2J" if full
-    puts "\e[0;0H"
+    move_to 0, 0
   end
 
   # Draws the current buffer to the screen.
   #
   def draw_buffer
     puts @buffer.map { |b| b.join }.join( "\r\n" )
+  end
+  
+  def move_to x, y
+    puts "\e[#{y};#{x}f"
+  end
+  
+  def render( full = false )
+    clear_screen full
+    
+    if @previous_render
+      burst_start = nil
+      chars = []
+      render_burst = -> {
+        next unless burst_start
+        move_to *burst_start
+        print chars
+        burst_start = nil
+        chars = []
+      }
+      @buffer.each_with_index do |line, y|
+        line.each_with_index do |char, x|
+          next render_burst if char == @previous_render[y][x]
+          burst_start ||= [x, y]
+          chars << char
+        end
+        render_burst
+      end
+    else
+      draw_buffer
+    end
+    @previous_render = @buffer.map(&:dup)
   end
 
   # Draws extra information onto HUD.
@@ -445,8 +476,7 @@ class Game
           end
         end
 
-        clear_screen true
-        draw_buffer
+        render true
         sleep 0.25
       end
 
@@ -455,8 +485,7 @@ class Game
         @buffer[ i / @screen_width ][ i % @screen_width ] = Color.colorize( " ", Color::WHITE, @color_mode )
 
         if j % ( 4 ** @color_mode ) == 0
-          clear_screen
-          draw_buffer
+          render
         end
       end
 
@@ -473,8 +502,7 @@ class Game
         @buffer[ i / @screen_width ][ i % @screen_width ] = @backup_buffer[ i / @screen_width ][ i % @screen_width ]
 
         if j % ( 4 ** @color_mode ) == 0
-          clear_screen
-          draw_buffer
+          render
         end
       end
     end
