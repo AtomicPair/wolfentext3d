@@ -51,12 +51,12 @@ Here are the features currently supported in Wolfentext:
 * Floor colors and pseudo-textures
 * Ceiling colors and pseudo-textures
 * Collision detection with wall sliding
+* True, multi-directional pushwalls (**NEW!**)
 * Title, help, debug, and ending screens
 * 16 colors of super-pixelated eye candy!
 
 ...and here are some **missing** features that are in the works:
 
-* Secret walls
 * Wall textures
 * Stationary and usable objects
 * Enemies and other entities
@@ -84,20 +84,51 @@ $ git clone http://github.com/AtomicPair/wolfentext3d.git
 Usage
 =====
 
+To start enjoying Wolfentext's pixelated goodness, command thine terminal thusly:
+
 ```
 $ cd wolfentext
 $ ruby wolfentext.rb
 ```
+
+Compatibility
+=============
+
+Wolfentext has been tested against the following terminals and platforms:
+
+| Terminal       | Platform     | B/W performance | Color performance |
+|----------------|--------------|----------------:|------------------:|
+| Command Prompt | Windows 7    |       30-45 fps |        0-15 fps   |
+| ConEmu         | Windows 7    |  Not yet tested |  Not yet tested   |
+| Cygwin         | Windows 7    |  Not yet tested |  Not yet tested   |
+| GNOME Terminal | Ubuntu 14.04 |       45-60 fps |        0-15 fps   |
+| Guake          | Ubuntu 14.04 |       45-60 fps |       45-60 fps   |
+| iTerm          | Mac OS X     |  Not yet tested |  Not yet tested   |
+| Konsole        | Ubuntu 14.04 |       45-60 fps |       45-60 fps   |
+| PowerShell     | Windows 7    |       30-45 fps |        0-15 fps   |
+| Tilda          | Ubuntu 14.04 |       45-60 fps |        0-15 fps   |
+| tmux           | Ubuntu 14.04 |       45-60 fps |       45-60 fps   |
+| XTerm          | Ubuntu 14.04 |       45-60 fps |        0-15 fps   |
+| Z shell (zsh)  | Mac OS X     |       45-60 fps |       45-60 fps   |
+
+Although most modern terminal emulators seem capable of delivering playable frame rates, it goes without saying that users with integrated or low-end graphics cards may experienced decreased (and in some cases, unplayable) performance.  I have noticed this myself when testing various terminal emulators on my main system: a five-year-old HP Pavilion dv7 laptop with hybrid ATI graphics.  *Some terminals performed over 100-200% faster when using the discrete ATI graphics card instead of the integrated Intel 915 chipset.*
+
+**If you are experiencing degraded or unplayable performance with Wolfentext in your favorite terminal program,** try adjusting the graphics properties of your host system (including switching to a discrete graphics mode, if your system supports it).  Using the table above as a guide, you can also try running Wolfentext in another terminal emulator which may yield better performance.
+
+Finally, help us keep this table updated with the latest information!  If you experience results different from these, please let us know by [filing an issue](http://github.com/AtomicPair/wolfentext3d/issues/) in the tracker.
 
 Issues
 ======
 
 Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some known issues with the game of which you should be aware:
 
-* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, achieving frame rates up to 60 fps.  However, Windows users may notice **significant** performance issues when using *any* color mode in the native Command Prompt or PowerShell terminals.  Other third-party terminals may yield better performance but have not yet been tested.
+* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, often achieving frame rates up to 60 fps.  However, some users may notice **significant** performance issues when using *any* color mode in their perferred terminal (see Compatibility section above).  Other third-party terminals may yield better performance but have not yet been tested.
+
 * *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release, assuming we can find a sensible cross-platform method that works.
+
 * *Terminal*: At present, the code assumes you are running this script in a compatible terminal.  Logic should be added that detects not only the current terminal upon program start, but also what features are presently available to that terminal and whether they are compatible with the current version of Wolfentext.
-* *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further graphical optimizations for Windows users, (2) reducing and/or eliminating the amount of floating-point math used across game calculations and lookup tables (with additional benchmarking to prove which optimizations are the most beneficial), and (3) optimizing any other remaining areas of the core ray casting engine, which presently consumes most of the processing time for each game loop iteration.  Other areas of opportunity may also exist which have not yet been identified.
+
+* *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further graphical optimizations for common, low-performing terminal configurations; (2) reducing and/or eliminating the amount of floating-point math used across game calculations and lookup tables (with additional benchmarking to prove which optimizations are the most beneficial); and (3) optimizing any other remaining areas of the core ray casting engine, which presently consumes most of the processing time for each game loop iteration.  Other areas of opportunity may also exist which have not yet been identified.
 
 Any thoughts or suggestions for solving these issues -- including pull requests -- are always welcome!
 
@@ -106,7 +137,20 @@ History
 
 Wolfentext was originally born from the need to share a code sample with a potential recruiter.  The sample had to be contained within a single file, and since I didn't have any public samples available at the time that I felt comfortable sharing, I spent the next few days creating the first iteration of Wolfentext from scratch.  Since then, the script has taken on a life of it's own: adding new features, fixing bugs, and morphing into an homage to the classic 2.5D shooters from the days of my youth.
 
+For the curious, here's a short summary table highlighting various milestones from past releases:
+
+| Release | Notable features                                |
+|---------|-------------------------------------------------|
+| 0.7.0   | Multi-direction pushwalls                       |
+|         | Multi-direction moving walls                    |
+|         | Directionally colored walls (light/dark)        |
+| 0.6.0   | Sliding doors                                   |
+| 0.5.1   | Player strafing support                         |
+| 0.3.0   | REAL non-blocking game loop and input system    |
+| 0.2.0   | Improved graphic system with almost no flicker  |
+| 0.1.0   | Initial alpha release                           |
+
 Support
 =======
 
-If you have any problems or suggestions, please file an issue in the official [GitHub repository](http://github.com/AtomicPair/wolfentext3d/).
+If you have any problems or suggestions, please file an issue in the official [GitHub repository](http://github.com/AtomicPair/wolfentext3d/issues/).

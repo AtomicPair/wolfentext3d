@@ -30,7 +30,73 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
+
+# Defines a single map cell in the current world map.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+class Cell
+  HEIGHT = 64
+  HALF   = 32
+  MARGIN = 24
+  WIDTH  = 64
+
+  MOVING_EAST  = 1
+  MOVING_NORTH = 2
+  MOVING_SOUTH = 4
+  MOVING_WEST  = 8
+
+  EMPTY_CELL     = "."
+  END_CELL       = "E"
+  DOOR_CELL      = "D"
+  DOOR_CELLS     = %w( - | )
+  MAGIC_CELL     = "S"
+  MOVE_WALL_HORZ = "m"
+  MOVE_WALL_VERT = "M"
+  MOVE_WALLS     = %w( M m )
+  PLAYER_CELLS   = %w( < ^ > v )
+  PLAYER_UP      = "^"
+  PLAYER_DOWN    = "v"
+  PLAYER_LEFT    = "<"
+  PLAYER_RIGHT   = ">"
+  SECRET_CELL    = "P"
+  WALL_CELLS     = %w( 1 2 3 4 5 6 7 8 )
+
+  attr_accessor :bottom
+  attr_accessor :direction
+  attr_accessor :left
+  attr_accessor :map
+  attr_accessor :offset
+  attr_accessor :right
+  attr_accessor :state
+  attr_accessor :top
+  attr_accessor :value
+  attr_accessor :x_cell
+  attr_accessor :y_cell
+
+  def initialize( args = {} )
+    @bottom    = args[ :bottom ] || 0
+    @direction = args[ :direction ]
+    @left      = args[ :left ]   || 0
+    @map       = args[ :map ]
+    @offset    = args[ :offset ] || 0
+    @right     = args[ :right ]  || 0
+    @state     = args[ :state ]
+    @top       = args[ :top ]    || 0
+    @value     = args[ :value ]  || EMPTY_CELL
+    @x_cell    = args[ :x_cell ]
+    @y_cell    = args[ :y_cell ]
+  end
+
+  # Identifies the type of cell class being used.
+  #
+  # @return [Symbol] The name of the current class
+  #
+  def type
+    self.class.to_s.downcase.to_sym
+  end
+end
 
 # Handles color information and application for the game.
 #
@@ -60,18 +126,91 @@ module Color
 
   # Colorizes a given piece of text for display in the terminal.
   #
-  # @param  [String]  value Text value to colorize
-  # @param  [Integer] color Terminal color code to use for colorizing
-  # @option [Integer] mode  Desired color mode to use (Color::MODE_X)
+  # @param value [String]  Text value to colorize
+  # @param color [Integer] Terminal color code to use for colorizing
+  # @param mode  [Integer] Desired color mode to use (Color::MODE_X)
+  # @return      [String]  The colorized string
   #
   def self.colorize( value, color, mode = 0 )
     case mode
     when MODE_NONE
       value
     when MODE_PARTIAL
-      "\e[1;#{ color }m#{ value }\e[0m";
+      color += 10 unless is_dark? color
+      "\e[1;#{ color }m#{ value }\e[0m"
     when MODE_FILL
-      "\e[7;#{ color };#{ color + 10 }m \e[0m";
+      "\e[7;#{ color };#{ color + 10 }m \e[0m"
+    end
+  end
+
+  private
+
+  # Tests whether a given color index is light or dark.
+  #
+  # @param color [Integer] Color value to be tested
+  #
+  def self.is_dark?( color )
+    if [ LIGHT_BLUE,
+         LIGHT_CYAN,
+         LIGHT_GRAY,
+         LIGHT_GREEN,
+         LIGHT_MAGENTA,
+         LIGHT_RED,
+         LIGHT_YELLOW ].include? color
+      false
+    else
+      true
+    end
+  end
+end
+
+# Defines the behavior and actions for the doors in our map.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+# @tip "I can only show you the door, Neo. You're the one who has to walk through it."
+#
+class Door < Cell
+  STATE_CLOSED  = 1
+  STATE_OPENING = 2
+  STATE_OPEN    = 3
+  STATE_CLOSING = 4
+
+  attr_accessor :open_since
+
+  def initialize( args = {} )
+    super args
+
+    @open_since = args[ :open_since ]
+    @state      = args[ :state ] || STATE_CLOSED
+    @value      = Cell::DOOR_CELL
+  end
+
+  # Checks and updates the doors state and position since the last update.
+  #
+  # @param delta_time [Float] The current delta time factor to apply to our movement calculations
+  #
+  def update( delta_time )
+    case @state
+    when STATE_CLOSED
+      return
+    when STATE_OPENING
+      if @offset >= Cell::WIDTH
+        @state = STATE_OPEN
+        @open_since = Time.now
+      else
+        @offset += ( 32 * delta_time )
+      end
+    when STATE_OPEN
+      if ( Time.now - @open_since ) > 5.0
+        @state = STATE_CLOSING
+        @open_since = 0.0
+      end
+    when STATE_CLOSING
+      if @offset <= 0
+        @state = STATE_CLOSED
+      else
+        @offset -= ( 32 * delta_time )
+      end
     end
   end
 end
@@ -81,9 +220,23 @@ end
 # @author Adam Parrott <parrott.adam@gmail.com>
 #
 module GameHelpers
+  # Ensures that a given value is within a specified range.
+  # If the value is less than the minimum value, the minimum
+  # value will be returned.  If the value is greater than the
+  # maximum value, the maximum value will be returned.
+  #
+  # @param test_value [Object] Value to be tested
+  # @param min_value  [Object] Minimum value in testing range
+  # @param max_value  [Object] Maximum value in testing range
+  # @return [Object] The test object clipped within the range limits
+  #
+  def clip_value( test_value, min_value, max_value )
+    [ [ test_value, min_value ].max, max_value ].min
+  end
+
   # Custom puts output method to handle unique console configuration.
   #
-  # @param [String] The text value to be output to the console
+  # @param string [String] The text value to be output to the console
   #
   def puts( string = "" )
     STDOUT.write "#{ string }\r\n"
@@ -91,7 +244,8 @@ module GameHelpers
 
   # Helper function to convert degrees to radians.
   #
-  # @param [Float] value Value in degrees to be converted to radians
+  # @param value [Float] Value in degrees to be converted to radians
+  # @return [Float] The input value converted to radians
   #
   def radians( value )
     value * 0.0174533
@@ -170,6 +324,265 @@ module Input
   end
 end
 
+# Defines the behavior and actions for our magical pushwalls.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+class Pushwall < Cell
+  STATE_STOPPED  = 0
+  STATE_MOVING   = 1
+  STATE_FINISHED = 2
+  TYPE_PUSH      = 1
+  TYPE_MOVE      = 2
+
+  attr_reader   :cells_moved
+  attr_accessor :to_x_cell
+  attr_accessor :to_y_cell
+  attr_accessor :type
+
+  def initialize( args = {} )
+    super args
+
+    @state = args[ :state ] || STATE_STOPPED
+    @type  = args[ :type ]  || TYPE_PUSH
+
+    @cells_moved = 0
+    @bottom      = ( @y_cell + 1 ) * Cell::HEIGHT
+    @left        = @x_cell * Cell::WIDTH
+    @right       = ( @x_cell + 1 ) * Cell::WIDTH
+    @top         = @y_cell * Cell::HEIGHT
+    @to_x_cell   = @x_cell
+    @to_y_cell   = @y_cell
+    @value       = Cell::SECRET_CELL
+  end
+
+  # Activates the pushwall in the desired direction.
+  #
+  # @param [Integer] direction The direction this pushwall should be moving (Cell::MOVING_X)
+  #
+  def activate( direction )
+    if @type == TYPE_PUSH && @state != STATE_STOPPED
+      return false
+    elsif @type == TYPE_MOVE && @state != STATE_STOPPED
+      return false
+    else
+      return reset( direction )
+    end
+  end
+
+  # Updates the pushwall's current state and position, if active.
+  #
+  # @param delta_time [Float] The current delta time factor to apply to our movement calculations.
+  #
+  def update( delta_time )
+    return if @state == STATE_FINISHED
+
+    case @type
+    when TYPE_MOVE
+      @push_amount = 64 * delta_time
+    when TYPE_PUSH
+      @push_amount = 32 * delta_time
+    end
+
+    case @direction
+    when MOVING_EAST
+      @cell_size   = Cell::WIDTH
+      @push_amount = -@push_amount
+      @push_left   = @push_amount
+      @push_right  = @push_amount
+      @push_top    = 0
+      @push_bottom = 0
+      @next_x_cell = @to_x_cell - 1
+      @next_y_cell = @to_y_cell
+      @next_left   = ( @next_x_cell + 1 ) * Cell::WIDTH
+      @next_right  = ( @to_x_cell + 1 ) * Cell::WIDTH
+      @next_top    = @to_y_cell * Cell::HEIGHT
+      @next_bottom = @next_y_cell * Cell::HEIGHT
+      @next_offset = @cell_size
+      @offset_good = ( @offset >= -@cell_size )
+
+    when MOVING_WEST
+      @cell_size   = Cell::WIDTH
+      @push_left   = @push_amount
+      @push_right  = @push_amount
+      @push_top    = 0
+      @push_bottom = 0
+      @next_x_cell = @to_x_cell + 1
+      @next_y_cell = @to_y_cell
+      @next_left   = @to_x_cell * Cell::WIDTH
+      @next_right  = @next_x_cell * Cell::WIDTH
+      @next_top    = @to_y_cell * Cell::HEIGHT
+      @next_bottom = @next_y_cell * Cell::HEIGHT
+      @next_offset = -@cell_size
+      @offset_good = ( @offset <= @cell_size )
+
+    when MOVING_NORTH
+      @cell_size   = Cell::HEIGHT
+      @push_amount = -@push_amount
+      @push_left   = 0
+      @push_right  = 0
+      @push_top    = @push_amount
+      @push_bottom = @push_amount
+      @next_x_cell = @to_x_cell
+      @next_y_cell = @to_y_cell - 1
+      @next_left   = @to_x_cell * Cell::WIDTH
+      @next_right  = @next_x_cell * Cell::WIDTH
+      @next_top    = ( @next_y_cell + 1 ) * Cell::HEIGHT
+      @next_bottom = ( @to_y_cell + 1 ) * Cell::HEIGHT
+      @next_offset = @cell_size
+      @offset_good = ( @offset >= -@cell_size )
+
+    when MOVING_SOUTH
+      @cell_size   = Cell::HEIGHT
+      @push_left   = 0
+      @push_right  = 0
+      @push_top    = @push_amount
+      @push_bottom = @push_amount
+      @next_x_cell = @to_x_cell
+      @next_y_cell = @to_y_cell + 1
+      @next_left   = @to_x_cell * Cell::WIDTH
+      @next_right  = @next_x_cell * Cell::WIDTH
+      @next_top    = @to_y_cell * Cell::HEIGHT
+      @next_bottom = @next_y_cell * Cell::HEIGHT
+      @next_offset = -@cell_size
+      @offset_good = ( @offset <= @cell_size )
+    end
+
+    @offset += @push_amount
+    @left   += @push_left
+    @right  += @push_right
+    @top    += @push_top
+    @bottom += @push_bottom
+
+    @map[ @to_y_cell ][ @to_x_cell ].offset += @push_amount
+    @map[ @to_y_cell ][ @to_x_cell ].left    = @left
+    @map[ @to_y_cell ][ @to_x_cell ].right   = @right
+    @map[ @to_y_cell ][ @to_x_cell ].top     = @top
+    @map[ @to_y_cell ][ @to_x_cell ].bottom  = @bottom
+
+    unless @offset_good
+      @cells_moved += 1
+
+      @map[ @y_cell ][ @x_cell ] = @map[ @to_y_cell ][ @to_x_cell ]
+      @map[ @y_cell ][ @x_cell ].offset = 0
+      @map[ @y_cell ][ @x_cell ].state  = STATE_STOPPED
+      @map[ @y_cell ][ @x_cell ].value  = Cell::EMPTY_CELL
+
+      @map[ @to_y_cell ][ @to_x_cell ] = self
+      @map[ @to_y_cell ][ @to_x_cell ].offset    = @push_amount
+      @map[ @to_y_cell ][ @to_x_cell ].state     = STATE_MOVING
+      @map[ @to_y_cell ][ @to_x_cell ].direction = @direction
+      @map[ @to_y_cell ][ @to_x_cell ].value     = Cell::SECRET_CELL
+
+      if @map[ @next_y_cell ][ @next_x_cell ].value == Cell::EMPTY_CELL
+        @x_cell    = @to_x_cell
+        @y_cell    = @to_y_cell
+        @to_x_cell = @next_x_cell
+        @to_y_cell = @next_y_cell
+
+        @left      = @next_left + @push_amount
+        @right     = @next_right + @push_amount
+        @top       = @next_top + @push_amount
+        @bottom    = @next_bottom + @push_amount
+
+        @map[ @to_y_cell ][ @to_x_cell ].offset    = @next_offset + @push_amount
+        @map[ @to_y_cell ][ @to_x_cell ].direction = @direction
+        @map[ @to_y_cell ][ @to_x_cell ].state     = STATE_MOVING
+        @map[ @to_y_cell ][ @to_x_cell ].value     = Cell::SECRET_CELL
+        @map[ @to_y_cell ][ @to_x_cell ].left      = @left
+        @map[ @to_y_cell ][ @to_x_cell ].right     = @right
+        @map[ @to_y_cell ][ @to_x_cell ].top       = @top
+        @map[ @to_y_cell ][ @to_x_cell ].bottom    = @bottom
+
+      else
+        @offset = 0
+        @value  = Cell::SECRET_CELL
+        @x_cell = @to_x_cell
+        @y_cell = @to_y_cell
+
+        @left   = @x_cell * Cell::WIDTH
+        @right  = ( @x_cell + 1 ) * Cell::WIDTH
+        @top    = @y_cell * Cell::HEIGHT
+        @bottom = ( @y_cell + 1 ) * Cell::HEIGHT
+
+        case @type
+        when TYPE_PUSH
+          @direction = nil
+          @state     = STATE_FINISHED
+        when TYPE_MOVE
+          case @direction
+          when MOVING_WEST
+            reset MOVING_EAST
+          when MOVING_EAST
+            reset MOVING_WEST
+          when MOVING_NORTH
+            reset MOVING_SOUTH
+          when MOVING_SOUTH
+            reset MOVING_NORTH
+          end
+        end
+      end
+    end
+  end
+
+  private
+
+  def reset( direction )
+    case direction
+    when MOVING_EAST
+      return false if @map[ @y_cell ][ @x_cell - 1 ].value != Cell::EMPTY_CELL
+
+      @direction = MOVING_EAST
+      @offset    = 0
+      @state     = STATE_MOVING
+      @to_offset = Cell::WIDTH
+      @to_x_cell = @x_cell - 1
+      @to_y_cell = @y_cell
+      @value     = Cell::SECRET_CELL
+
+    when MOVING_WEST
+      return false if @map[ @y_cell ][ @x_cell + 1 ].value != Cell::EMPTY_CELL
+
+      @direction = MOVING_WEST
+      @offset    = 0
+      @state     = STATE_MOVING
+      @to_offset = -Cell::WIDTH
+      @to_x_cell = @x_cell + 1
+      @to_y_cell = @y_cell
+      @value     = Cell::SECRET_CELL
+
+    when MOVING_NORTH
+      return false if @map[ @y_cell - 1 ][ @x_cell ].value != Cell::EMPTY_CELL
+
+      @direction = MOVING_NORTH
+      @offset    = 0
+      @state     = STATE_MOVING
+      @to_offset = Cell::HEIGHT
+      @to_x_cell = @x_cell
+      @to_y_cell = @y_cell - 1
+      @value     = Cell::SECRET_CELL
+
+    when MOVING_SOUTH
+      return false if @map[ @y_cell + 1 ][ @x_cell ].value != Cell::EMPTY_CELL
+
+      @direction = MOVING_SOUTH
+      @offset    = 0
+      @state     = STATE_MOVING
+      @to_offset = -Cell::HEIGHT
+      @to_x_cell = @x_cell
+      @to_y_cell = @y_cell + 1
+      @value     = Cell::SECRET_CELL
+    end
+
+    @map[ @to_y_cell ][ @to_x_cell ].direction = @direction
+    @map[ @to_y_cell ][ @to_x_cell ].offset    = @to_offset
+    @map[ @to_y_cell ][ @to_x_cell ].state     = STATE_MOVING
+    @map[ @to_y_cell ][ @to_x_cell ].value     = Cell::SECRET_CELL
+
+    return true
+  end
+end
+
 # Main game class
 #
 # @author Adam Parrott <parrott.adam@gmail.com>
@@ -177,18 +590,6 @@ end
 class Game
   include GameHelpers
   include Math
-
-  DOOR_CLOSED  = 1
-  DOOR_OPENING = 2
-  DOOR_OPEN    = 3
-  DOOR_CLOSING = 4
-
-  MAP_END_CELL = "E"
-  MAP_EMPTY_CELL = "."
-  MAP_DOOR_CELL = "D"
-  MAP_DOOR_CELLS = %w( - | )
-  MAP_MAGIC_CELL = "M"
-  MAP_PLAYER_CELL = "P"
 
   WIPE_BLINDS       = 1
   WIPE_PIXELIZE_IN  = 2
@@ -205,25 +606,33 @@ class Game
   #
   def play
     show_title_screen
-    reset_frame_rate
+    activate_movewalls
+    reset_timers
     update_buffer
 
     while true
       check_input
+      check_collisions
       update_buffer
       update_doors
+      update_movewalls
+      update_pushwalls
       update_frame_rate
       update_delta_time
-      draw_debug_info if @display_debug_info
-      sleep 0.015
+      draw_debug_info if @show_debug_info
+
+      # TODO: Dynamically update this based on frame rate.
+      # If the current frame rate exceeds the target refresh
+      # rate, then sleep execution and/or drop frames to
+      # maintain the desired maximum refresh rate.
+      #
+      sleep 0.010
     end
   end
 
   private
 
-  ##############
-  # Attributes #
-  ##############
+  ## Attributes ##
 
   # Defines our time-independent step value for movement calculations.
   #
@@ -237,72 +646,471 @@ class Game
     ( @angles[ 90 ] * @delta_time )
   end
 
-  ###########
-  # Methods #
-  ###########
+  ## Methods ##
 
-  # Checks whether the player has collided with a wall.
+  # Activate all of the moveable walls in the current map.
+  #
+  def activate_movewalls
+    return if @movewalls.size == 0
+
+    @movewalls.each do |movewall|
+      movewall.activate movewall.direction
+    end
+  end
+
+  # Checks for horizontal intersections in the world map along a given angle.
+  #
+  # @param x_start [Integer] Starting X world coordinate to use for casting
+  # @param y_start [Integer] Starting Y world coordinate to use for casting
+  # @param angle   [Float]   Starting viewing angle to use for casting
+  #
+  def cast_x_ray( x_start, y_start, angle )
+    @x_ray_dist = 0
+    @x_push_dist = 1e+8
+    @x_x_cell = 0
+    @x_y_cell = 0
+
+    # Abort the cast if the next Y step sends us out of bounds.
+    #
+    if @y_step[ angle ].abs == 0
+      return 1e+8
+    end
+
+    if angle < @angles[ 90 ] || angle >= @angles[ 270 ]
+      #
+      # Setup our cast for the right half of the map.
+      #  _ _ _  ____
+      # |_|_|_|/    |
+      # |_|_|_/     |
+      # |_|_|/      |
+      # |_|_|\      |
+      # |_|_|_\     |
+      # |_|_|_|\____|
+      #
+      @x_bound = Cell::WIDTH + Cell::WIDTH * ( x_start / Cell::WIDTH )
+      @x_delta = Cell::WIDTH
+      @y_intercept = @tan_table[ angle ] * ( @x_bound - x_start ) + y_start
+      @next_x_cell = 0
+    else
+      #
+      # Setup our cast for the left half of the map.
+      #  ____  _ _ _
+      # |    \|_|_|_|
+      # |     \_|_|_|
+      # |      \|_|_|
+      # |      /|_|_|
+      # |     /_|_|_|
+      # |____/|_|_|_|
+      #
+      @x_bound = Cell::WIDTH * ( x_start / Cell::WIDTH )
+      @x_delta = -Cell::WIDTH
+      @y_intercept = @tan_table[ angle ] * ( @x_bound - x_start ) + y_start
+      @next_x_cell = -1
+    end
+
+    # Check to see if we have any visible pushwalls in our ray's path.
+    #
+    ( @movewalls + @pushwalls ).each do |pushwall|
+      case pushwall.direction
+      when Cell::MOVING_EAST, Cell::MOVING_WEST
+        # The wall is moving in one the directions we can work with.
+      else
+        next
+      end
+
+      if angle >= @angles[ 90 ] && angle < @angles[ 270 ]
+        @push_x_bound = pushwall.right
+        next if @push_x_bound > x_start
+      else
+        @push_x_bound = pushwall.left
+        next if @push_x_bound < x_start
+      end
+
+      @push_y_intercept = @tan_table[ angle ] * ( @push_x_bound - x_start ) + y_start
+      @push_x_cell = ( @push_x_bound / Cell::WIDTH ).to_i
+      @push_y_cell = ( @push_y_intercept / Cell::HEIGHT ).to_i
+      @push_map_cell = @map[ @push_y_cell ][ @push_x_cell ] rescue nil
+
+      next if @push_map_cell.nil?
+
+      if @push_map_cell.value == Cell::SECRET_CELL \
+         && ( pushwall.x_cell == @push_x_cell || pushwall.to_x_cell == @push_x_cell ) \
+         && ( pushwall.y_cell == @push_y_cell || pushwall.to_y_cell == @push_y_cell )
+
+        @push_dist = ( @push_y_intercept - y_start ) * @inv_sin_table[ angle ]
+
+        if @push_dist < @x_push_dist
+          @x_push_dist = @push_dist
+          @x_push_x_cell = @push_x_cell
+          @x_push_y_cell = @push_y_cell
+          @x_push_map_cell = @push_map_cell
+        end
+      end
+    end
+
+    while true
+      # Calculate the next X and Y cells hit by our casted ray,
+      # and see if they fall within our map's boundaries.
+      #
+      @x_x_cell = ( ( @x_bound + @next_x_cell ) / Cell::WIDTH ).to_i
+      @x_y_cell = ( @y_intercept / Cell::HEIGHT ).to_i
+
+      if @x_x_cell.between?( 0, @map_columns - 1 ) && @x_y_cell.between?( 0, @map_rows - 1 )
+        @x_map_cell = @map[ @x_y_cell ][ @x_x_cell ]
+      else
+        @x_intercept = 1e+8
+        break
+      end
+
+      # Check the map cell at the intersected coordinates.
+      #
+      case @x_map_cell.value
+      when Cell::END_CELL
+        break
+      when Cell::DOOR_CELL
+        if @x_map_cell.offset < ( @y_intercept % Cell::HEIGHT )
+          @y_intercept += ( @y_step[ angle ] / 2 )
+          break
+        end
+      when Cell::SECRET_CELL
+        case @x_map_cell.state
+        when Pushwall::STATE_MOVING
+          case @x_map_cell.direction
+          when Cell::MOVING_NORTH, Cell::MOVING_SOUTH
+            if @x_map_cell.offset >= 0 && ( @y_intercept % Cell::HEIGHT ) > @x_map_cell.offset
+              break
+            elsif @x_map_cell.offset < 0 && ( @y_intercept % Cell::HEIGHT ) < ( Cell::WIDTH + @x_map_cell.offset )
+              break
+            end
+          when Cell::MOVING_EAST, Cell::MOVING_WEST
+            if @x_map_cell.offset.between? -1, 1
+              break
+            end
+          end
+        when Pushwall::STATE_STOPPED, Pushwall::STATE_FINISHED
+          break
+        end
+      when Cell::WALL_CELLS.first..Cell::WALL_CELLS.last
+        break
+      end
+
+      @y_intercept += @y_step[ angle ]
+      @x_bound += @x_delta
+    end
+
+    if @y_intercept == 1e+8
+      @x_ray_dist = 1e+8
+    else
+      @x_ray_dist = ( @y_intercept - y_start ) * @inv_sin_table[ angle ]
+    end
+
+    if @x_push_dist < @x_ray_dist
+      @x_map_cell = @x_push_map_cell
+      @x_x_cell = @x_push_x_cell
+      @x_y_cell = @x_push_y_cell
+      return @x_push_dist
+    else
+      return @x_ray_dist
+    end
+  end
+
+  # Checks for vertical intersections in the world map along a given angle.
+  #
+  # @param x_start [Integer] Starting X world coordinate to use for casting
+  # @param y_start [Integer] Starting Y world coordinate to use for casting
+  # @param angle   [Float]   Starting viewing angle to use for casting
+  #
+  def cast_y_ray( x_start, y_start, angle )
+    @y_ray_dist = 0
+    @y_push_dist = 1e+8
+    @y_x_cell = 0
+    @y_y_cell = 0
+
+    # Abort the cast if the next X step sends us out of bounds.
+    #
+    if @x_step[ angle ].abs == 0
+      return 1e+8
+    end
+
+    if angle >= @angles[ 0 ] && angle < @angles[ 180 ]
+      #
+      # Setup our cast for the lower half of the map.
+      #  _ _ _ _ _ _
+      # |_|_|_|_|_|_|
+      # |_|_|_|_|_|_|
+      # |_|_|/ \|_|_|
+      # |_|_/   \_|_|
+      # |_|/     \|_|
+      # |_/_______\_|
+      #
+      @y_bound = Cell::HEIGHT + Cell::HEIGHT * ( y_start / Cell::HEIGHT )
+      @y_delta = Cell::HEIGHT
+      @x_intercept = @inv_tan_table[ angle ] * ( @y_bound - y_start ) + x_start
+      @next_y_cell = 0
+    else
+      #
+      # Setup our cast for the upper half of the map.
+      #  _ _______ _
+      # |_\       /_|
+      # |_|\     /|_|
+      # |_|_\   /_|_|
+      # |_|_|\ /|_|_|
+      # |_|_|_|_|_|_|
+      # |_|_|_|_|_|_|
+      #
+      @y_bound = Cell::HEIGHT * ( y_start / Cell::HEIGHT )
+      @y_delta = -Cell::HEIGHT
+      @x_intercept = @inv_tan_table[ angle ] * ( @y_bound - y_start ) + x_start
+      @next_y_cell = -1
+    end
+
+    # Check to see if we have any visible pushwalls in our ray's path.
+    #
+    ( @movewalls + @pushwalls ).each do |pushwall|
+      case pushwall.direction
+      when Cell::MOVING_NORTH, Cell::MOVING_SOUTH
+        # The wall is moving in one the directions we can work with.
+      else
+        next
+      end
+
+      if angle >= @angles[ 0 ] && angle < @angles[ 180 ]
+        @push_y_bound = pushwall.top
+        next if @push_y_bound < y_start
+      else
+        @push_y_bound = pushwall.bottom
+        next if @push_y_bound > y_start
+      end
+
+      @push_x_intercept = @inv_tan_table[ angle ] * ( @push_y_bound - y_start ) + x_start
+      @push_x_cell = ( @push_x_intercept / Cell::WIDTH ).to_i
+      @push_y_cell = ( @push_y_bound / Cell::HEIGHT ).to_i
+      @push_map_cell = @map[ @push_y_cell ][ @push_x_cell ] rescue nil
+
+      next if @push_map_cell.nil?
+
+      if @push_map_cell.value == Cell::SECRET_CELL \
+         && ( pushwall.x_cell == @push_x_cell || pushwall.to_x_cell == @push_x_cell ) \
+         && ( pushwall.y_cell == @push_y_cell || pushwall.to_y_cell == @push_y_cell )
+
+        @push_dist = ( @push_x_intercept - x_start ) * @inv_cos_table[ angle ]
+
+        if @push_dist < @y_push_dist
+          @y_push_dist = @push_dist
+          @y_push_x_cell = @push_x_cell
+          @y_push_y_cell = @push_y_cell
+          @y_push_map_cell = @push_map_cell
+        end
+      end
+    end
+
+    while true
+      # Calculate the next X and Y cells hit by our casted ray,
+      # and see if they fall within our map's boundaries.
+      #
+      @y_x_cell = ( @x_intercept / Cell::WIDTH ).to_i
+      @y_y_cell = ( ( @y_bound + @next_y_cell ) / Cell::HEIGHT ).to_i
+
+      if @y_x_cell.between?( 0, @map_columns - 1 ) && @y_y_cell.between?( 0, @map_rows - 1 )
+        @y_map_cell = @map[ @y_y_cell ][ @y_x_cell ]
+      else
+        @x_intercept = 1e+8
+        break
+      end
+
+      # Check the map cell at the intersected coordinates.
+      #
+      case @y_map_cell.value
+      when Cell::END_CELL
+        break
+      when Cell::DOOR_CELL
+        if @y_map_cell.offset < ( @x_intercept % Cell::WIDTH )
+          @x_intercept += ( @x_step[ angle ] / 2 )
+          break
+        end
+      when Cell::SECRET_CELL
+        case @y_map_cell.state
+        when Pushwall::STATE_MOVING
+          case @y_map_cell.direction
+          when Cell::MOVING_EAST, Cell::MOVING_WEST
+            if @y_map_cell.offset >= 0 && ( @x_intercept % Cell::WIDTH ) > @y_map_cell.offset
+              break
+            elsif @y_map_cell.offset < 0 && ( @x_intercept % Cell::WIDTH ) < ( Cell::WIDTH + @y_map_cell.offset )
+              break
+            end
+          when Cell::MOVING_NORTH, Cell::MOVING_SOUTH
+            if @y_map_cell.offset.between? -1, 1
+              break
+            end
+          end
+        when Pushwall::STATE_STOPPED, Pushwall::STATE_FINISHED
+          break
+        end
+      when Cell::WALL_CELLS.first..Cell::WALL_CELLS.last
+        break
+      end
+
+      @x_intercept += @x_step[ angle ]
+      @y_bound += @y_delta
+    end
+
+    if @x_intercept == 1e+8
+      @y_ray_dist = 1e+8
+    else
+      @y_ray_dist = ( @x_intercept - x_start ) * @inv_cos_table[ angle ]
+    end
+
+    if @y_push_dist < @y_ray_dist
+      @y_map_cell = @y_push_map_cell
+      @y_x_cell = @y_push_x_cell
+      @y_y_cell = @y_push_y_cell
+      return @y_push_dist
+    else
+      return @y_ray_dist
+    end
+  end
+
+  # Checks for collisions between the player and other world objects.
   #
   def check_collisions
-    @x_cell = @player_x / @cell_width
-    @y_cell = @player_y / @cell_height
-    @x_sub_cell = @player_x % @cell_width
-    @y_sub_cell = @player_y % @cell_height
+    @x_cell = @player_x / Cell::WIDTH
+    @y_cell = @player_y / Cell::HEIGHT
+    @x_sub_cell = @player_x % Cell::WIDTH
+    @y_sub_cell = @player_y % Cell::HEIGHT
 
-    if @move_x > 0
-      # Player is moving right
-      unless @map[ @y_cell ][ @x_cell + 1 ][ :value ] == MAP_EMPTY_CELL
-        if @map[ @y_cell ][ @x_cell + 1 ][ :value ] == MAP_END_CELL
-          show_end_screen
-        elsif @map[ @y_cell ][ @x_cell + 1 ][ :value ] == MAP_DOOR_CELL &&
-              @map[ @y_cell ][ @x_cell + 1 ][ :state ] == DOOR_OPEN
-          # Let the player pass through the open door
-        elsif @x_sub_cell >= ( @cell_width - @cell_margin )
-          @move_x = -( @x_sub_cell - ( @cell_width - @cell_margin ) )
-        end
+    if @player_move_x == 0 && @player_move_y == 0
+      @map_cell = @map[ @y_cell ][ @x_cell + 1 ]
+
+      if @map_cell.value == Cell::SECRET_CELL \
+        && @map_cell.direction == Cell::MOVING_EAST \
+        && @player_x >= ( @map_cell.left.to_i - ( Cell::WIDTH - Cell::MARGIN ) )
+
+        @player_move_x = @map_cell.left.to_i - ( Cell::WIDTH - Cell::MARGIN ) - @player_x
       end
-    else
-      # Player is moving left
-      unless @map [ @y_cell ][ @x_cell - 1 ][ :value ] == MAP_EMPTY_CELL
-        if @map[ @y_cell ][ @x_cell - 1 ][ :value ] == MAP_END_CELL
-          show_end_screen
-        elsif @map[ @y_cell ][ @x_cell - 1 ][ :value ] == MAP_DOOR_CELL &&
-              @map[ @y_cell ][ @x_cell - 1 ][ :state ] == DOOR_OPEN
-          # Let the player pass through the open door
-        elsif @x_sub_cell <= @cell_margin
-          @move_x = @cell_margin - @x_sub_cell
-        end
+
+      @map_cell = @map[ @y_cell ][ @x_cell - 1 ]
+
+      if @map_cell.value == Cell::SECRET_CELL \
+        && @map_cell.direction == Cell::MOVING_WEST \
+        && @player_x <= @map_cell.right.to_i + Cell::MARGIN
+
+        @player_move_x = @map_cell.right.to_i + Cell::MARGIN - @player_x
+      end
+
+      @map_cell = @map[ @y_cell + 1 ][ @x_cell ]
+
+      if @map_cell.value == Cell::SECRET_CELL \
+        && @map_cell.direction == Cell::MOVING_NORTH \
+        && @player_y >= ( @map_cell.top.to_i - ( Cell::HEIGHT - Cell::MARGIN ) )
+
+        @player_move_y = @map_cell.top.to_i - ( Cell::HEIGHT - Cell::MARGIN ) - @player_y
+      end
+
+      @map_cell = @map[ @y_cell - 1 ][ @x_cell ]
+
+      if @map_cell.value == Cell::SECRET_CELL \
+        && @map_cell.direction == Cell::MOVING_SOUTH \
+        && @player_y <= ( @map_cell.bottom.to_i + Cell::MARGIN )
+
+        @player_move_y = @map_cell.bottom.to_i + Cell::MARGIN - @player_y
       end
     end
 
-    if @move_y > 0
-      # Player is moving up
-      unless @map[ @y_cell + 1 ][ @x_cell ][ :value ] == MAP_EMPTY_CELL
-        if @map[ @y_cell + 1 ][ @x_cell ][ :value ] == MAP_END_CELL
-          show_end_screen
-        elsif @map[ @y_cell + 1 ][ @x_cell ][ :value ] == MAP_DOOR_CELL &&
-              @map[ @y_cell + 1 ][ @x_cell ][ :state ] == DOOR_OPEN
-          # Let the player pass through the open door
-        elsif @y_sub_cell >= ( @cell_height - @cell_margin )
-          @move_y = -( @y_sub_cell - ( @cell_height - @cell_margin ) )
+    # Check for collisions while player is moving west
+    #
+    if @player_move_x > 0
+      @map_cell = @map[ @y_cell ][ @x_cell + 1 ]
+
+      if @map_cell.value == Cell::EMPTY_CELL
+        # Let the player keep on walkin'...
+      elsif @map_cell.value == Cell::END_CELL
+        show_end_screen
+      elsif @map_cell.value == Cell::DOOR_CELL \
+         && @map_cell.state == Door::STATE_OPEN
+        # Let the player pass through the open door...
+      elsif @map_cell.value == Cell::SECRET_CELL \
+         && @map_cell.state == Pushwall::STATE_MOVING
+
+        if @player_x >= ( @map_cell.left.to_i - ( Cell::WIDTH - Cell::MARGIN ) )
+          @player_move_x = @map_cell.left.to_i - ( Cell::WIDTH - Cell::MARGIN ) - @player_x
         end
+      elsif @x_sub_cell >= ( Cell::WIDTH - Cell::MARGIN )
+        @player_move_x = -( @x_sub_cell - ( Cell::WIDTH - Cell::MARGIN ) )
       end
-    else
-      # Player is moving down
-      unless @map[ @y_cell - 1 ][ @x_cell ][ :value ] == MAP_EMPTY_CELL
-        if @map[ @y_cell - 1 ][ @x_cell ][ :value ] == MAP_END_CELL
-          show_end_screen
-        elsif @map[ @y_cell - 1 ][ @x_cell ][ :value ] == MAP_DOOR_CELL &&
-              @map[ @y_cell - 1 ][ @x_cell ][ :state ] == DOOR_OPEN
-          # Let the player pass through the open door
-        elsif @y_sub_cell <= @cell_margin
-          @move_y = @cell_margin - @y_sub_cell
+
+    # Check for collisions while player is moving east
+    #
+    elsif @player_move_x < 0
+      @map_cell = @map[ @y_cell ][ @x_cell - 1 ]
+
+      if @map_cell.value == Cell::EMPTY_CELL
+        # Let the player keep on walkin'...
+      elsif @map_cell.value == Cell::END_CELL
+        show_end_screen
+      elsif @map_cell.value == Cell::DOOR_CELL \
+         && @map_cell.state == Door::STATE_OPEN
+        # Let the player pass through the open door...
+      elsif @map_cell.value == Cell::SECRET_CELL \
+         && @map_cell.state == Pushwall::STATE_MOVING
+
+        if @player_x <= ( @map_cell.right.to_i + Cell::MARGIN )
+          @player_move_x = @map_cell.right.to_i + Cell::MARGIN - @player_x
         end
+      elsif @x_sub_cell <= Cell::MARGIN
+        @player_move_x = Cell::MARGIN - @x_sub_cell
       end
     end
 
-    @player_x += @move_x
-    @player_y += @move_y
+    # Check for collisions while player is moving south
+    #
+    if @player_move_y > 0
+      @map_cell = @map[ @y_cell + 1 ][ @x_cell ]
+
+      if @map_cell.value == Cell::EMPTY_CELL
+        # Let the player keep on walkin'...
+      elsif @map_cell.value == Cell::END_CELL
+        show_end_screen
+      elsif @map_cell.value == Cell::DOOR_CELL \
+         && @map_cell.state == Door::STATE_OPEN
+        # Let the player pass through the open door...
+      elsif @map_cell.value == Cell::SECRET_CELL \
+         && @map_cell.state == Pushwall::STATE_MOVING
+
+        if @player_y >= ( @map_cell.top.to_i - ( Cell::HEIGHT - Cell::MARGIN ) )
+          @player_move_y = @map_cell.top.to_i - ( Cell::HEIGHT - Cell::MARGIN ) - @player_y
+        end
+      elsif @y_sub_cell >= ( Cell::HEIGHT - Cell::MARGIN )
+        @player_move_y = -( @y_sub_cell - ( Cell::HEIGHT - Cell::MARGIN ) )
+      end
+
+    # Check for collisions while player is moving north
+    #
+    elsif @player_move_y < 0
+      @map_cell = @map[ @y_cell - 1 ][ @x_cell ]
+
+      if @map_cell.value == Cell::EMPTY_CELL
+        # Let the player keep on walkin'...
+      elsif @map_cell.value == Cell::END_CELL
+        show_end_screen
+      elsif @map_cell.value == Cell::DOOR_CELL \
+         && @map_cell.state == Door::STATE_OPEN
+        # Let the player pass through the open door...
+      elsif @map_cell.value == Cell::SECRET_CELL \
+         && @map_cell.state == Pushwall::STATE_MOVING
+
+        if @player_y <= ( @map_cell.bottom.to_i + Cell::MARGIN )
+          @player_move_y = @map_cell.bottom.to_i + Cell::MARGIN - @player_y
+        end
+      elsif @y_sub_cell <= Cell::MARGIN
+        @player_move_y = Cell::MARGIN - @y_sub_cell
+      end
+    end
+
+    @player_x = clip_value( @player_x + @player_move_x, Cell::WIDTH,  @map_x_size - Cell::WIDTH )
+    @player_y = clip_value( @player_y + @player_move_y, Cell::HEIGHT, @map_y_size - Cell::HEIGHT )
+
+    @player_move_x = 0
+    @player_move_y = 0
   end
 
   # Waits for and processes keyboard input from user.
@@ -318,17 +1126,22 @@ class Game
       # Escape
       when "\e"
 
+      # Backspace
+      when "\177"
+        @player_angle = ( @player_angle - @angles [ 90 ] ) % @angles[ 360 ]
+
+      # Delete
+      when "\004"
+
       # Up arrow
       when "\e[A", "\u00E0H", "w"
-        @move_x = ( @cos_table[ @player_angle ] * movement_step ).round
-        @move_y = ( @sin_table[ @player_angle ] * movement_step ).round
-        check_collisions
+        @player_move_x = ( @cos_table[ @player_angle ] * movement_step ).round
+        @player_move_y = ( @sin_table[ @player_angle ] * movement_step ).round
 
       # Down arrow
       when "\e[B", "\u00E0P", "s"
-        @move_x = -( @cos_table[ @player_angle ] * movement_step ).round
-        @move_y = -( @sin_table[ @player_angle ] * movement_step ).round
-        check_collisions
+        @player_move_x = -( @cos_table[ @player_angle ] * movement_step ).round
+        @player_move_y = -( @sin_table[ @player_angle ] * movement_step ).round
 
       # Right arrow
       when "\e[C", "\u00E0M", "l"
@@ -343,17 +1156,40 @@ class Game
         exit 0
 
       when " "
-        @move_x = ( @cos_table[ @player_angle ] * @cell_width ).round
-        @move_y = ( @sin_table[ @player_angle ] * @cell_height ).round
-        @x_cell = ( @player_x + @move_x ) / @cell_width
-        @y_cell = ( @player_y + @move_y ) / @cell_height
+        @move_x = ( @cos_table[ @player_angle ] * Cell::WIDTH ).round
+        @move_y = ( @sin_table[ @player_angle ] * Cell::HEIGHT ).round
+        @x_cell = ( @player_x + @move_x ) / Cell::WIDTH
+        @y_cell = ( @player_y + @move_y ) / Cell::HEIGHT
 
-        if @map[ @y_cell ][ @x_cell ][ :value ] == MAP_DOOR_CELL
-          case @map[ @y_cell ][ @x_cell ][ :state ]
-          when DOOR_CLOSED
-            @map[ @y_cell ][ @x_cell ][ :state ] = DOOR_OPENING
-          when DOOR_OPEN
-            @map[ @y_cell ][ @x_cell ][ :state ] = DOOR_CLOSING
+        case @map[ @y_cell ][ @x_cell ].class.to_s
+        when "Door"
+          case @map[ @y_cell ][ @x_cell ].state
+          when Door::STATE_CLOSED
+            @map[ @y_cell ][ @x_cell ].state = Door::STATE_OPENING
+            @doors << @map[ @y_cell ][ @x_cell ]
+          when Door::STATE_OPEN
+            @map[ @y_cell ][ @x_cell ].state = Door::STATE_CLOSING
+          end
+        when "Pushwall"
+          case @map[ @y_cell ][ @x_cell ].type
+          when Pushwall::TYPE_PUSH
+            if @move_x.abs > @move_y.abs
+              if @player_angle >= @angles[ 90 ] && @player_angle < @angles[ 270 ]
+                @push_direction = Cell::MOVING_EAST
+              else
+                @push_direction = Cell::MOVING_WEST
+              end
+            else
+              if @player_angle >= @angles[ 0 ] && @player_angle < @angles[ 180 ]
+                @push_direction = Cell::MOVING_SOUTH
+              elsif @player_angle >= @angles[ 180 ] && @player_angle < @angles[ 360 ]
+                @push_direction = Cell::MOVING_NORTH
+              end
+            end
+
+            if @map[ @y_cell ][ @x_cell ].activate( @push_direction )
+              @pushwalls << @map[ @y_cell ][ @x_cell ]
+            end
           end
         end
 
@@ -362,18 +1198,24 @@ class Game
 
       when "a"
         # Player is attempting to strafe left
-        @move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
-        @move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
-        check_collisions
+        @player_move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        @player_move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
 
       when "d"
         # Player is attempting to strafe right
-        @move_x = ( @cos_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
-        @move_y = ( @sin_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
-        check_collisions
+        @player_move_x = ( @cos_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        @player_move_y = ( @sin_table[ ( @player_angle + @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
 
       when "c"
         @draw_ceiling = !@draw_ceiling
+
+        if @draw_ceiling
+          @ceiling_color = @default_ceiling_color
+          @ceiling_texture = @default_ceiling_texture
+        else
+          @ceiling_color = Color::BLACK
+          @ceiling_texture = " "
+        end
 
       when "?"
         show_debug_screen
@@ -381,11 +1223,19 @@ class Game
       when "f"
         @draw_floor = !@draw_floor
 
+        if @draw_floor
+          @floor_color = @default_floor_color
+          @floor_texture = @default_floor_texture
+        else
+          @floor_color = Color::BLACK
+          @floor_texture = " "
+        end
+
       when "h"
         show_help_screen
 
       when "i"
-        @display_debug_info = !@display_debug_info
+        @show_debug_info = !@show_debug_info
         clear_screen true
 
       when "m"
@@ -396,9 +1246,17 @@ class Game
         draw_screen_wipe WIPE_PIXELIZE_OUT
         update_buffer
 
+      when "p"
+        Input.get_key
+        reset_frame_rate
+
       when "q"
         show_exit_screen
-    end
+
+      when "r"
+        load __FILE__
+
+      end
   end
 
   # Clears the current screen buffer.
@@ -427,13 +1285,13 @@ class Game
   # Draws extra information onto HUD.
   #
   def draw_debug_info
-    STDOUT.write "\e[1;#{ @screen_width - 9 }H"
-    STDOUT.write "#{ '%.2f' % @frame_rate } fps "
+    @debug_string = "#{ @player_x / Cell::WIDTH } x #{ @player_y / Cell::HEIGHT } | #{ '%.2f' % @frame_rate } fps "
+    STDOUT.write "\e[1;#{ @screen_width - @debug_string.size }H #{ @debug_string }"
   end
 
   # Applies the selected screen wipe/transition to the active buffer.
   #
-  # @param [Integer] type Desired wipe mode to use (WIPE_X)
+  # @param type [Integer] Desired wipe mode to use (WIPE_X)
   #
   def draw_screen_wipe( type )
     case type
@@ -489,7 +1347,7 @@ class Game
 
     @status_left = "(Press H for help)".ljust( 18 )
     @status_middle = @hud_messages[ @play_count % 3 ].center( 44 )
-    @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }°".ljust( 18 )
+    @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 18 )
 
     puts @status_left + @status_middle + @status_right
   end
@@ -508,169 +1366,74 @@ class Game
   # @author Adam Parrott <parrott.adam@gmail.com>
   # @author Andre LaMothe <andre@gameinstitute.com>
   #
-  # @param [Integer] x_start Starting X world coordinate to use for casting
-  # @param [Integer] y_start Starting Y world coordinate to use for casting
-  # @param [Float]   angle   Starting viewing angle to use for casting
+  # @param x_start [Integer] Starting X world coordinate to use for casting
+  # @param y_start [Integer] Starting Y world coordinate to use for casting
+  # @param angle   [Float]   Starting viewing angle to use for casting
   #
   def ray_cast( x_start, y_start, angle )
-    @view_angle = ( angle - @angles[ 30 ] + @angles[ 360 ] ) % @angles[ 360 ]
+    @cast_angle = ( angle - @angles[ @half_fov ] + @angles[ 360 ] ) % @angles[ 360 ]
 
     for ray in 1..@screen_width
-      if @view_angle >= @angles[ 0 ] && @view_angle < @angles[ 180 ]
-        # Upper half plane
-        #
-        @y_bound = @cell_height + @cell_height * ( y_start / @cell_height )
-        @y_delta = @cell_height
-        @xi = @inv_tan_table[ @view_angle ] * ( @y_bound - y_start ) + x_start
-        @next_y_cell = 0
-      else
-        # Lower half plane
-        #
-        @y_bound = @cell_height * ( y_start / @cell_height )
-        @y_delta = -@cell_height
-        @xi = @inv_tan_table[ @view_angle ] * ( @y_bound - y_start ) + x_start
-        @next_y_cell = -1
-      end
-
-      if @view_angle < @angles[ 90 ] || @view_angle >= @angles[ 270 ]
-        # Right half plane
-        #
-        @x_bound = @cell_width + @cell_width * ( x_start / @cell_width )
-        @x_delta = @cell_width
-        @yi = @tan_table[ @view_angle ] * ( @x_bound - x_start ) + y_start
-        @next_x_cell = 0
-      else
-        # Left half plane
-        #
-        @x_bound = @cell_width * ( x_start / @cell_width )
-        @x_delta = -@cell_width
-        @yi = @tan_table[ @view_angle ] * ( @x_bound - x_start ) + y_start
-        @next_x_cell = -1
-      end
-
-      @x_ray = false
-      @x_cell = 0
-      @x_dist = 0
-      @x_x_save = 0
-      @x_y_save = 0
-
-      @y_ray = false
-      @y_cell = 0
-      @y_dist = 0
-      @y_x_save = 0
-      @y_y_save = 0
-
-      @casting = 2
-
-      while @casting > 0
-        unless @x_ray
-          if @y_step[ @view_angle ].abs == 0 || !@x_bound.between?( 0, @map_x_size )
-            @x_ray = true
-            @casting -= 1
-            @x_dist = 1e+8
-          end
-
-          @x_cell = ( ( @x_bound + @next_x_cell ) / @cell_width ).to_i
-          @y_cell = ( @yi.to_i / @cell_height ).to_i
-          @x_map_cell = @map[ @y_cell ][ @x_cell ] rescue nil
-          @hit_type = @x_map_cell[ :value ] rescue MAP_EMPTY_CELL
-
-          if @hit_type == MAP_EMPTY_CELL
-            @yi += @y_step[ @view_angle ]
-          elsif @hit_type == MAP_DOOR_CELL && @x_map_cell[ :offset ] > ( @yi % 64 )
-            @yi += @y_step[ @view_angle ]
-          else
-            @yi += ( @y_step[ @view_angle ] / 2 ) if @hit_type == MAP_DOOR_CELL
-            @x_dist = ( @yi - y_start ) * @inv_sin_table[ @view_angle ]
-            @x_map = @x_map_cell[ :value ]
-            @yi_save = @yi
-            @xb_save = @x_bound
-            @x_x_save = @x_cell
-            @x_y_save = @y_cell
-
-            @x_ray = true
-            @casting -= 1
-          end
-        end
-
-        unless @y_ray
-          if @x_step[ @view_angle ].abs == 0 || !@y_bound.between?( 0, @map_y_size )
-            @y_ray = true
-            @casting -= 1
-            @y_dist = 1e+8
-          end
-
-          @x_cell = ( @xi.to_i / @cell_width ).to_i
-          @y_cell = ( ( @y_bound + @next_y_cell ) / @cell_height ).to_i
-          @y_map_cell = @map[ @y_cell ][ @x_cell ] rescue nil
-          @hit_type = @y_map_cell[ :value ] rescue MAP_EMPTY_CELL
-
-          if @hit_type == MAP_EMPTY_CELL
-            @xi += @x_step[ @view_angle ]
-          elsif @hit_type == MAP_DOOR_CELL && @y_map_cell[ :offset ] > ( @xi % 64 )
-            @xi += @x_step[ @view_angle ]
-          else
-            @xi += ( @x_step[ @view_angle ] / 2 ) if @hit_type == MAP_DOOR_CELL
-            @y_dist = ( @xi - x_start ) * @inv_cos_table[ @view_angle ]
-            @y_map = @y_map_cell[ :value ]
-            @xi_save = @xi
-            @yb_save = @y_bound
-            @y_x_save = @x_cell
-            @y_y_save = @y_cell
-
-            @y_ray = true
-            @casting -= 1
-          end
-        end
-
-        @x_bound += @x_delta
-        @y_bound += @y_delta
-      end
+      @x_dist = cast_x_ray( x_start, y_start, @cast_angle )
+      @y_dist = cast_y_ray( x_start, y_start, @cast_angle )
 
       if @x_dist < @y_dist
-        @dist = @x_dist
-        @map_type = @x_map
-        @map_x = @x_x_save
-        @map_y = @x_y_save
-        @scale = ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @x_dist ) ) ).round
+        @cast[ ray ] =
+        {
+          dist: @x_dist,
+          map_x: @x_x_cell,
+          map_y: @x_y_cell,
+          map_type: @x_map_cell.value,
+          scale: ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @x_dist ) ) ).round,
+          dark_wall: true
+        }
       else
-        @dist = @y_dist
-        @map_type = @y_map
-        @map_x = @y_x_save
-        @map_y = @y_y_save
-        @scale = ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @y_dist ) ) ).round
+        @cast[ ray ] =
+        {
+          dist: @y_dist,
+          map_x: @y_x_cell,
+          map_y: @y_y_cell,
+          map_type: @y_map_cell.value,
+          scale: ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @y_dist ) ) ).round,
+          dark_wall: false
+        }
       end
 
-      @wall_scale = ( @scale / 2 ).to_i
+      @cast_angle = ( @cast_angle + 1 ) % @angles[ 360 ]
+    end
+  end
+
+  # Fills the buffer with the results of our ray casting data.
+  #
+  def populate_buffer
+    @cast.each_with_index do |ray, index|
+      next if ray.nil?
+
+      @wall_scale = ( clip_value( ray[ :scale ], 0, @screen_height ) / 2 ).to_i
       @wall_top = ( @screen_height / 2 ) - @wall_scale
       @wall_bottom = ( @screen_height / 2 ) + @wall_scale
-      @wall_color = @wall_colors[ @map_type ]
-      @wall_texture = @map_type
-      @wall_sliver = Color.colorize( @wall_texture, @wall_color, @color_mode )
 
-      @ceiling_sliver = if @draw_ceiling
-                          Color.colorize( @ceiling_texture, Color::LIGHT_GRAY, @color_mode )
-                        else
-                          " "
-                        end
-      @floor_sliver = if @draw_floor
-                          Color.colorize( @floor_texture, Color::GRAY, @color_mode )
-                        else
-                          " "
-                        end
+      @wall_color = @wall_colors[ ray[ :map_type ] ][ ray[ :dark_wall ] ? 0 : 1 ]
+      @wall_sliver = Color.colorize( ray[ :map_type ], @wall_color, @color_mode )
+      @ceiling_sliver = Color.colorize( @ceiling_texture, @ceiling_color, @color_mode )
+      @floor_sliver = Color.colorize( @floor_texture, @floor_color, @color_mode )
 
-      @sliver  = "#{ @ceiling_sliver }," * [ @wall_top - 1, 0 ].max
-      @sliver += "#{ @wall_sliver },"    * ( @wall_bottom - @wall_top + 1 )
-      @sliver += "#{ @floor_sliver },"   * [ @screen_height - @wall_bottom, 0 ].max
+      @slice  = "#{ @ceiling_sliver }," * [ @wall_top - 1, 0 ].max
+      @slice += "#{ @wall_sliver },"    * ( @wall_bottom - @wall_top + 1 )
+      @slice += "#{ @floor_sliver },"   * [ @screen_height - @wall_bottom, 0 ].max
 
-      @final_sliver = @sliver.split( "," )
+      @sliver = @slice.split( "," )
 
       for y in 0...@screen_height
-        @buffer[ y ][ ray ] = @final_sliver[ y ]
+        @buffer[ y ][ index ] = @sliver[ y ]
       end
-
-      @view_angle = ( @view_angle + 1 ) % @angles[ 360 ]
     end
+  end
+
+  # Resets the delta time adjustment value used for our movement calculations.
+  #
+  def reset_delta_time
+    @delta_start_time = Time.now
   end
 
   # Resets the frame rate metrics.
@@ -688,12 +1451,25 @@ class Game
     STDOUT.write "\e[?25h"
   end
 
+  # Resets world map.
+  #
+  def reset_map
+    setup_map
+  end
+
   # Resets player's position.
   #
   def reset_player
-    @player_angle = @starting_angle
-    @player_x = @starting_x
-    @player_y = @starting_y
+    @player_angle = @player_starting_angle
+    @player_x = @player_starting_x
+    @player_y = @player_starting_y
+  end
+
+  # Resets internal game timers.
+  #
+  def reset_timers
+    reset_delta_time
+    reset_frame_rate
   end
 
   # Configures the console input stream for game usage.
@@ -711,93 +1487,149 @@ class Game
   # Configures the world map.
   #
   def setup_map
-    # Are you cheating by looking at this map?  Maybe we should apply some
-    # run-length encoding to this data so it's no so easy for the casual
-    # observer to admire it's contents. :-) [ABP 20160308]
-    #
+    @movewalls = []
+    @pushwalls = []
+
     @map = \
     [
-      %w( 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 ),
-      %w( 1 P . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
-      %w( 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
-      %w( 1 . . 2 2 2 2 2 - 2 2 2 2 2 2 2 2 2 2 2 2 2 2 - 2 2 2 2 2 . . 1 ),
-      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
-      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 3 3 3 3 3 3 3 3 3 - 3 3 3 3 3 3 3 3 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 4 4 4 4 4 4 4 4 4 4 4 4 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . 6 5 5 5 5 5 5 5 . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . 5 . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . 6 5 5 5 5 5 6 5 . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . | . . 3 . . 4 . . 5 . . . . 5 . 5 . . 4 . . 3 . . | . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . 5 . . . . 5 . 5 . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . 5 5 5 5 5 5 5 6 . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . 5 E . . . . . . . M 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . 5 5 5 5 5 5 5 6 . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . | . . . . . . . . . . . . 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . 4 4 4 4 4 4 4 4 4 4 4 4 4 4 . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 . . . . . . . . . . . . . . . . . . 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . 3 - 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 - 3 . . 2 . . 1 ),
-      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
-      %w( 1 . . 2 . . . . . . . . . . . . . . . . . . . . . . . . 2 . . 1 ),
-      %w( 1 . . 2 2 2 2 2 2 2 2 2 2 2 2 - 2 2 2 2 2 2 2 2 2 2 2 2 2 . . 1 ),
-      %w( 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
-      %w( 1 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1 ),
-      %w( 5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 5 )
+      %w( 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 2 2 2 2 ),
+      %w( 5 . . . . . . . . . . . . . . . . . 4 4 . . . . . . . . | . . 2 ),
+      %w( 5 . . . . . . . 6 6 6 . . . . . . . 4 4 . . . . . . . 4 2 2 . 2 ),
+      %w( 5 . . . . . . . 6 M 6 . . . . . . . 4 4 . m . . . . . 4 2 2 . 2 ),
+      %w( 5 . . . . . . 6 6 . 6 6 . . . . . . 4 4 . . m . . . . 4 2 2 . 2 ),
+      %w( 5 . . . 6 . . . . . . . . . 6 . . . 4 4 . . . m . . . 4 2 . . 2 ),
+      %w( 5 . 6 6 6 . . . . . . . . . 6 6 6 . 4 4 . . . . . . . 4 2 . 2 2 ),
+      %w( 5 . 6 m . . . . 3 . 3 m . . . . 6 . 4 4 . 3 . . . 3 . 4 2 . 2 2 ),
+      %w( 5 . 6 6 6 . . . . . . . . . 6 6 6 . 4 4 . . . . . . . 4 2 . 2 2 ),
+      %w( 5 . . . 6 . . . . . . . . . 6 . . . 4 4 . . . m . . . 4 2 . . 2 ),
+      %w( 5 . . . . . . 6 6 . 6 6 . . . . . . 4 4 . . . . m . . 4 2 2 . 2 ),
+      %w( 5 . . . . . . . 6 E 6 . . . . . . . 4 4 . . . . . m . 4 2 2 . 2 ),
+      %w( 5 . . . . . . . 6 6 6 . . . . . . . 4 4 . . . . . . . 4 2 2 . 2 ),
+      %w( 5 . . . . . . . . . . . . . . . . . 4 4 . . . . . . . 4 2 . . 2 ),
+      %w( 5 5 5 5 5 5 5 - 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 - 4 4 4 4 2 . 2 2 ),
+      %w( 5 5 . . 5 . . . . . 5 4 4 4 4 4 4 4 4 4 . . . . . . . 4 2 . 2 2 ),
+      %w( 5 5 . . | . . . . . 5 . . . . . . . . . . . . . . . . 4 2 . 2 2 ),
+      %w( 5 . . . 5 . . . . . | . . . . . . . . . . . . . . . . 4 2 . . 2 ),
+      %w( 5 . . . 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 2 . . 2 ),
+      %w( 2 P 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 P 2 ),
+      %w( 2 . . . 2 2 2 . . . 2 1 M 1 . . . . . . 1 M 1 1 . . . . 2 . . 2 ),
+      %w( 2 . . . 2 2 2 . . . 2 . . . . . . . . . . . . 1 . . . . 2 . . 2 ),
+      %w( 2 . . . 2 2 2 . . . 2 . . . . . . . . . . . . 1 . . . . | . . 2 ),
+      %w( 2 2 - 2 2 2 2 2 - 2 2 . . . . . . . . . . . . 1 . . . . 2 . . 2 ),
+      %w( 2 . . . . . . . . . 2 . . . . 3 . . 3 . . . . 1 . . . . 2 2 2 2 ),
+      %w( 2 . . . . . . . . . | . . . . . . . . . . . . | . . . . 2 2 2 2 ),
+      %w( 2 . . . . . . . . . 2 . . . . 3 . . 3 . . . . 1 . . . . 2 2 2 2 ),
+      %w( 2 2 - 2 2 2 2 2 - 2 2 . . . . . . . . . . . . 1 . . . . 2 . . 2 ),
+      %w( 2 . . . 2 2 2 . . . 2 . . . . . . . . . . . . 1 . . . . | . . 2 ),
+      %w( 2 . . . 2 2 2 . . . 2 . M . . . . . . . . M . 1 . . . . 2 . . 2 ),
+      %w( 2 . ^ . 2 2 2 . . . 2 1 . 1 . . . . . . 1 . 1 1 . . . . 2 . . 2 ),
+      %w( 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 )
     ]
 
     for y in 0...@map_rows
       for x in 0...@map_columns
-        if MAP_DOOR_CELLS.include? @map[ y ][ x ]
-          @map[ y ][ x ] = {
-            value: MAP_DOOR_CELL,
-            offset: 0,
-            state: DOOR_CLOSED
-          }
-        elsif @map[ y ][ x ] == MAP_MAGIC_CELL
-          @map[ y ][ x ] = { value: MAP_EMPTY_CELL }
-          @magic_x = x * @cell_width + ( @cell_width / 2 )
-          @magic_y = y * @cell_height + ( @cell_height / 2 )
-        elsif @map[ y ][ x ] == MAP_PLAYER_CELL
-          @map[ y ][ x ] = { value: MAP_EMPTY_CELL }
-          @starting_x = x * @cell_width + ( @cell_width / 2 )
-          @starting_y = y * @cell_height + ( @cell_height / 2 )
+        if Cell::DOOR_CELLS.include? @map[ y ][ x ]
+          @map[ y ][ x ] = Door.new(
+            map: @map,
+            x_cell: x,
+            y_cell: y
+          )
+
+        elsif @map[ y ][ x ] == Cell::MAGIC_CELL
+          @map[ y ][ x ] = Cell.new(
+            map: @map,
+            x_cell: x,
+            y_cell: y
+          )
+
+          @magic_x = x * Cell::WIDTH + ( Cell::WIDTH / 2 )
+          @magic_y = y * Cell::HEIGHT + ( Cell::HEIGHT / 2 )
+
+        elsif Cell::PLAYER_CELLS.include? @map[ y ][ x ]
+          case @map[ y ][ x ]
+          when Cell::PLAYER_UP
+            @player_starting_angle = @angles[ 270 ]
+          when Cell::PLAYER_DOWN
+            @player_starting_angle = @angles[ 90 ]
+          when Cell::PLAYER_LEFT
+            @player_starting_angle = @angles[ 180 ]
+          when Cell::PLAYER_RIGHT
+            @player_starting_angle = @angles[ 0 ]
+          end
+
+          @map[ y ][ x ] = Cell.new(
+            map: @map,
+            x_cell: x,
+            y_cell: y
+          )
+
+          @player_starting_x = x * Cell::WIDTH + ( Cell::WIDTH / 2 )
+          @player_starting_y = y * Cell::HEIGHT + ( Cell::HEIGHT / 2 )
+
+        elsif Cell::MOVE_WALLS.include? @map[ y ][ x ]
+          case @map[ y ][ x ]
+          when Cell::MOVE_WALL_HORZ
+            @push_direction = Cell::MOVING_WEST
+          when Cell::MOVE_WALL_VERT
+            @push_direction = Cell::MOVING_SOUTH
+          end
+
+          @map[ y ][ x ] = Pushwall.new(
+            map: @map,
+            x_cell: x,
+            y_cell: y,
+            direction: @push_direction,
+            type: Pushwall::TYPE_MOVE
+          )
+
+          @movewalls << @map[ y ][ x ]
+
+        elsif @map[ y ][ x ] == Cell::SECRET_CELL
+          @map[ y ][ x ] = Pushwall.new(
+            map: @map,
+            x_cell: x,
+            y_cell: y,
+            type: Pushwall::TYPE_PUSH
+          )
+
         else
-          @map[ y ][ x ] = { value: @map[ y ][ x ] }
+          @map[ y ][ x ] = Cell.new(
+            map: @map,
+            value: @map[ y ][ x ],
+            x_cell: x,
+            y_cell: y
+          )
         end
       end
     end
 
-    @player_angle = @starting_angle
-    @player_x = @starting_x
-    @player_y = @starting_y
+    @player_angle = @player_starting_angle
+    @player_x = @player_starting_x
+    @player_y = @player_starting_y
   end
 
   # Configures all precalculated lookup tables.
   #
   def setup_tables
-    @angles = []
-    @cos_table = []
-    @sin_table = []
-    @tan_table = []
+    @angles         = []
+    @cast           = []
+    @cos_table      = []
+    @sin_table      = []
+    @tan_table      = []
+    @doors          = []
     @fish_eye_table = []
-    @inv_cos_table = []
-    @inv_sin_table = []
-    @inv_tan_table = []
-    @x_step = []
-    @y_step = []
-    @wall_colors = {}
+    @inv_cos_table  = []
+    @inv_sin_table  = []
+    @inv_tan_table  = []
+    @movewalls      = []
+    @pushwalls      = []
+    @x_step         = []
+    @y_step         = []
+    @wall_colors    = {}
 
     for i in 0..360
       @angles[ i ] = ( i * @fixed_step ).round
     end
-
-    @starting_angle = @angles[ @starting_angle ]
 
     # Configure our trigonometric lookup tables, because math is good.
     #
@@ -813,35 +1645,36 @@ class Game
       @inv_tan_table[ angle ] = 1.0 / tan( rad_angle )
 
       if angle >= @angles[ 0 ] && angle < @angles[ 180 ]
-        @y_step[ angle ] =  ( @tan_table[ angle ] * @cell_height ).abs
+        @y_step[ angle ] =  ( @tan_table[ angle ] * Cell::HEIGHT ).abs
       else
-        @y_step[ angle ] = -( @tan_table[ angle ] * @cell_height ).abs
+        @y_step[ angle ] = -( @tan_table[ angle ] * Cell::HEIGHT ).abs
       end
 
       if angle >= @angles[ 90 ] && angle < @angles[ 270 ]
-        @x_step[ angle ] = -( @inv_tan_table[ angle ] * @cell_width ).abs
+        @x_step[ angle ] = -( @inv_tan_table[ angle ] * Cell::WIDTH ).abs
       else
-        @x_step[ angle ] =  ( @inv_tan_table[ angle ] * @cell_width ).abs
+        @x_step[ angle ] =  ( @inv_tan_table[ angle ] * Cell::WIDTH ).abs
       end
     end
 
-    half_fov = @player_fov / 2
-
-    for angle in -@angles[ half_fov ]..@angles[ half_fov ]
+    for angle in -@angles[ @half_fov ]..@angles[ @half_fov ]
       rad_angle = ( 3.272e-4 ) + angle * 2 * 3.141592654 / @angles[ 360 ]
-      @fish_eye_table[ angle + @angles[ half_fov ] ] = 1.0 / cos( rad_angle )
+      @fish_eye_table[ angle + @angles[ @half_fov ] ] = 1.0 / cos( rad_angle )
     end
 
     # Configure some basic lookup tables for our wall colors.
     #
-    @wall_colors[ '1' ] = Color::BLUE
-    @wall_colors[ '2' ] = Color::LIGHT_BLUE
-    @wall_colors[ '3' ] = Color::GREEN
-    @wall_colors[ '4' ] = Color::LIGHT_GREEN
-    @wall_colors[ '5' ] = Color::YELLOW
-    @wall_colors[ '6' ] = Color::LIGHT_YELLOW
-    @wall_colors[ 'D' ] = Color::MAGENTA
-    @wall_colors[ 'E' ] = Color::BLACK
+    @wall_colors[ '1' ] = [ Color::BLUE, Color::LIGHT_BLUE ]
+    @wall_colors[ '2' ] = [ Color::GREEN, Color::LIGHT_GREEN ]
+    @wall_colors[ '3' ] = [ Color::YELLOW, Color::LIGHT_YELLOW ]
+    @wall_colors[ '4' ] = [ Color::CYAN, Color::LIGHT_CYAN ]
+    @wall_colors[ '5' ] = [ Color::BLUE, Color::LIGHT_BLUE ]
+    @wall_colors[ '6' ] = [ Color::GREEN, Color::LIGHT_GREEN ]
+    @wall_colors[ '7' ] = [ Color::YELLOW, Color::LIGHT_YELLOW ]
+    @wall_colors[ '8' ] = [ Color::CYAN, Color::LIGHT_CYAN ]
+    @wall_colors[ 'D' ] = [ Color::MAGENTA, Color::LIGHT_MAGENTA ]
+    @wall_colors[ 'E' ] = [ Color::WHITE, Color::WHITE ]
+    @wall_colors[ 'P' ] = [ Color::RED, Color::LIGHT_RED ]
 
     # Configure our snarky HUD messages to the player.
     #
@@ -855,52 +1688,69 @@ class Game
 
   # Configures all application variables.
   #
+  # NOTE: The order of some of these blocks are dependent upon one another,
+  # so take care when moving or refactoring lines in this method.
+  #
   def setup_variables
+    # Define the variables for our world map.
+    #
+    @map_columns = 32
+    @map_rows = 32
+    @map_x_size = @map_columns * Cell::WIDTH
+    @map_y_size = @map_rows * Cell::HEIGHT
+
+    # Define the ever-important player variables.
+    #
+    @player_angle = 0
+    @player_fov = 60
+    @player_move_x = 0
+    @player_move_y = 0
+    @player_starting_angle = 90
+    @player_starting_x = 0
+    @player_starting_y = 0
+    @player_x = 0
+    @player_y = 0
+
+    # Define our screen dimensions and field-of-view metrics.
+    #
+    @half_fov = @player_fov / 2
     @screen_width = 80
     @screen_height = 36
 
     @buffer = Array.new( @screen_height ) { Array.new( @screen_width ) }
 
-    @cell_height = 64
-    @cell_width = 64
-    @cell_margin = 32
-
-    @map_columns = 32
-    @map_rows = 32
-    @map_x_size = @map_columns * @cell_width
-    @map_y_size = @map_rows * @cell_height
-
-    @player_angle = 0
-    @player_fov = 64
-    @player_x = 0
-    @player_y = 0
-
-    @starting_angle = 0
-    @starting_x = 0
-    @starting_y = 0
-
-    @move_x = 0
-    @move_y = 0
-
     @fixed_factor = 512
     @fixed_count = ( 360 * @screen_width ) / @player_fov
     @fixed_step = @fixed_count / 360.0
 
-    @delta_start_time = 0.0
-    @delta_time = 0.0
-
-    @frames_rendered = 0
     @frame_rate = 0.0
+    @frames_rendered = 0
     @frame_start_time = 0.0
 
-    @ceiling_texture = "%"
-    @floor_texture = "-"
-    @wall_texture = "#"
+    # Define default colors and textures.
+    #
+    @default_ceiling_color = Color::LIGHT_GRAY
+    @default_ceiling_texture = "@"
+    @default_floor_color = Color::GRAY
+    @default_floor_texture = "-"
+    @default_wall_texture = "#"
 
-    @color_mode = Color::MODE_NONE
-    @display_debug_info = false
+    @ceiling_color = @default_ceiling_color
+    @ceiling_texture = @default_ceiling_texture
+    @floor_color = @default_floor_color
+    @floor_texture = " "
+    @wall_texture = @default_wall_texture
+
     @draw_ceiling = true
-    @draw_floor = true
+    @draw_floor = false
+    @draw_walls = true
+
+    # Define miscellaneous game variables.
+    #
+    @color_mode = Color::MODE_NONE
+    @delta_start_time = 0.0
+    @delta_time = 0.0
+    @show_debug_info = false
     @play_count = 0
   end
 
@@ -916,20 +1766,23 @@ class Game
     puts "[ Flags ]".center( @screen_width )
     puts
     puts ( "Color mode".ljust( 25 )          + @color_mode.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "Ceiling enabled?".ljust( 25 )    + @draw_ceiling.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "Display extra info?".ljust( 25 ) + @display_debug_info.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "Floor enabled?".ljust( 25 )      + @draw_floor.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "Draw ceiling?".ljust( 25 )       + @draw_ceiling.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "Draw floor?".ljust( 25 )         + @draw_floor.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "Display extra info?".ljust( 25 ) + @show_debug_info.to_s.rjust( 25 ) ).center( @screen_width )
     puts
     puts "[ Metrics ]".center( @screen_width )
     puts
-    puts ( "cell_height".ljust( 25 )         + @cell_height.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "cell_width".ljust( 25 )          + @cell_width.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "active_doors".ljust( 25 )        + @doors.size.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "active_movewalls".ljust( 25 )    + @movewalls.size.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "active_pushwalls".ljust( 25 )    + @pushwalls.size.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "cell_height".ljust( 25 )         + Cell::HEIGHT.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "cell_width".ljust( 25 )          + Cell::WIDTH.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "frames_rendered".ljust( 25 )     + @frames_rendered.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "frame_rate".ljust( 25 )          + @frame_rate.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "frame_total_time".ljust( 25 )    + ( Time.now - @frame_start_time ).to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "frame_total_time".ljust( 25 )    + ( Time.now - @frame_start_time ).round( 4 ).to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "play_count".ljust( 25 )          + @play_count.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_angle".ljust( 25 )        + ( @player_angle / @fixed_step ).to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_angle_raw".ljust( 25 )    + @player_angle.to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "player_angle".ljust( 25 )        + ( @player_angle / @fixed_step ).round( 2 ).to_s.rjust( 25 ) ).center( @screen_width )
+    puts ( "player_angle_raw".ljust( 25 )    + @player_angle.round( 2 ).to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_fov".ljust( 25 )          + @player_fov.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_x".ljust( 25 )            + @player_x.to_s.rjust( 25 ) ).center( @screen_width )
     puts ( "player_y".ljust( 25 )            + @player_y.to_s.rjust( 25 ) ).center( @screen_width )
@@ -976,6 +1829,7 @@ class Game
     @play_count += 1
 
     reset_player
+    reset_map
     clear_screen true
     update_buffer
   end
@@ -1009,11 +1863,13 @@ class Game
     puts
     puts "[ Notes ]".center( @screen_width )
     puts
-    puts "Windows users: testing has shown that running this".center( @screen_width )
-    puts "script in any color mode under most terminals will".center( @screen_width )
-    puts "result in very poor performance.  For now, it is  ".center( @screen_width )
-    puts "recommended that you run in 'no color' mode to    ".center( @screen_width )
-    puts "enjoy the highest framerate and best experience.  ".center( @screen_width )
+    puts "Testing has shown that running this game in color ".center( @screen_width )
+    puts "mode under some terminals will result in very poor".center( @screen_width )
+    puts "poor performance.  Thus, if you experience low    ".center( @screen_width )
+    puts "frame rates in your chosen terminal, try running  ".center( @screen_width )
+    puts "in 'no color' mode OR use a different terminal    ".center( @screen_width )
+    puts "altogether for the best possible experience. See  ".center( @screen_width )
+    puts "the README for a table of compatible terminals.   ".center( @screen_width )
     puts
     puts "Enjoy the game!                                   ".center( @screen_width )
     puts
@@ -1025,6 +1881,8 @@ class Game
     puts ( "Strafe right".ljust( 25 )   + "D".rjust( 25 ) ).center( @screen_width )
     puts ( "Turn left".ljust( 25 )      + "Left Arrow, K".rjust( 25 ) ).center( @screen_width )
     puts ( "Turn right".ljust( 25 )     + "Right Arrow, L".rjust( 25 ) ).center( @screen_width )
+    puts
+    puts ( "Open doors/activate walls".ljust( 25 ) + "Space".rjust( 25 ) ).center( @screen_width )
     puts
     puts ( "Toggle ceiling".ljust( 25 )    + "C".rjust( 25 ) ).center( @screen_width )
     puts ( "Toggle debug info".ljust( 25 ) + "I".rjust( 25 ) ).center( @screen_width )
@@ -1101,6 +1959,7 @@ class Game
   def update_buffer
     clear_buffer
     ray_cast @player_x, @player_y, @player_angle
+    populate_buffer
     clear_screen
     draw_buffer
     draw_status_line
@@ -1108,44 +1967,51 @@ class Game
 
   # Updates the current delta time factor, which we apply to all time-based
   # calculations (like object movement, animations, etc.) to acheive the same
-  # amount of movement across different frame rates and environments.
+  # rate of movement across different terminals and frame rates. 
   #
   def update_delta_time
-    @delta_time = Time.now - @delta_start_time
+    @delta_time = ( Time.now - @delta_start_time ).to_f
     @delta_start_time = Time.now
   end
 
-  # Check state and update position of all active doors.
+  # Updates the state and position of all active doors.
   #
   def update_doors
-    for y in 0...@map_rows
-      for x in 0...@map_columns
-        cell = @map[ y ][ x ]
+    return if @doors.size == 0
 
-        if cell[ :value ] == MAP_DOOR_CELL
-          case cell[ :state ]
-          when DOOR_CLOSED
-            next
-          when DOOR_OPENING
-            if cell[ :offset ] >= @cell_width
-              cell[ :state ] = DOOR_OPEN
-              cell[ :open_since ] = Time.now
-            else
-              cell[ :offset ] += ( 32 * @delta_time )
-            end
-          when DOOR_OPEN
-            if ( Time.now - cell[ :open_since ] ) > 5.0
-              cell[ :state ] = DOOR_CLOSING
-              cell[ :open_since ] = 0.0
-            end
-          when DOOR_CLOSING
-            if cell[ :offset ] <= 0
-              cell[ :state ] = DOOR_CLOSED
-            else
-              cell[ :offset ] -= ( 32 * @delta_time )
-            end
-          end
-        end
+    @doors.each do |door|
+      door.update @delta_time
+
+      if door.state == Door::STATE_CLOSED
+        @doors.delete door
+      end
+    end
+  end
+
+  # Updates the state and position of any moving walls.
+  #
+  def update_movewalls
+    return if @movewalls.size == 0
+
+    @movewalls.each do |movewall|
+      movewall.update @delta_time
+
+      if movewall.state == Pushwall::STATE_FINISHED
+        @movewalls.delete movewall
+      end
+    end
+  end
+
+  # Updates the state and position of any active pushwalls.
+  #
+  def update_pushwalls
+    return if @pushwalls.size == 0
+
+    @pushwalls.each do |pushwall|
+      pushwall.update @delta_time
+
+      if pushwall.state == Pushwall::STATE_FINISHED
+        @pushwalls.delete pushwall
       end
     end
   end
