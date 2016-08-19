@@ -48,22 +48,21 @@ Here are the features currently supported in Wolfentext:
 
 * Solid orthogonal walls
 * Recessed sliding doors
-* Floor colors and pseudo-textures
-* Ceiling colors and pseudo-textures
+* Solid floor and ceiling background
 * Collision detection with wall sliding
-* True, multi-directional pushwalls (**NEW!**)
+* True, multi-directional pushwalls
 * Title, help, debug, and ending screens
 * 16 colors of super-pixelated eye candy!
+* 256-color wall textures (**NEW!**)
 
 ...and here are some **missing** features that are in the works:
 
-* Wall textures
+* Textured floors and ceilings
 * Stationary and usable objects
 * Enemies and other entities
 * Sounds or music
 * Resizeable viewport
 * OS and terminal type detection
-* 256 colors (on supported terminals)
 
 Requirements
 ============
@@ -141,6 +140,7 @@ For the curious, here's a short summary table highlighting various milestones fr
 
 | Release | Notable features                                |
 |---------|-------------------------------------------------|
+| 0.8.0   | Wall textures                                   |
 | 0.7.0   | Multi-direction pushwalls                       |
 |         | Multi-direction moving walls                    |
 |         | Directionally colored walls (light/dark)        |

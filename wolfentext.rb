@@ -30,7 +30,7 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 
 # Defines a single map cell in the current world map.
 #
@@ -47,21 +47,19 @@ class Cell
   MOVING_SOUTH = 4
   MOVING_WEST  = 8
 
-  EMPTY_CELL     = "."
-  END_CELL       = "E"
-  DOOR_CELL      = "D"
-  DOOR_CELLS     = %w( - | )
-  MAGIC_CELL     = "S"
-  MOVE_WALL_HORZ = "m"
-  MOVE_WALL_VERT = "M"
-  MOVE_WALLS     = %w( M m )
-  PLAYER_CELLS   = %w( < ^ > v )
-  PLAYER_UP      = "^"
-  PLAYER_DOWN    = "v"
-  PLAYER_LEFT    = "<"
-  PLAYER_RIGHT   = ">"
-  SECRET_CELL    = "P"
-  WALL_CELLS     = %w( 1 2 3 4 5 6 7 8 )
+  DIRECTION_CELLS = %w( < ^ > v )
+  DIRECTION_DOWN  = "v"
+  DIRECTION_LEFT  = "<"
+  DIRECTION_RIGHT = ">"
+  DIRECTION_UP    = "^"
+  DOOR_CELL       = "D"
+  DOOR_CELLS      = %w( - | )
+  EMPTY_CELL      = "."
+  END_CELL        = "E"
+  MAGIC_CELL      = "M"
+  PLAYER_CELL     = "S"
+  PUSH_WALL       = "P"
+  WALL_CELL       = "W"
 
   attr_accessor :bottom
   attr_accessor :direction
@@ -70,23 +68,25 @@ class Cell
   attr_accessor :offset
   attr_accessor :right
   attr_accessor :state
+  attr_accessor :texture_id
   attr_accessor :top
   attr_accessor :value
   attr_accessor :x_cell
   attr_accessor :y_cell
 
   def initialize( args = {} )
-    @bottom    = args[ :bottom ] || 0
-    @direction = args[ :direction ]
-    @left      = args[ :left ]   || 0
-    @map       = args[ :map ]
-    @offset    = args[ :offset ] || 0
-    @right     = args[ :right ]  || 0
-    @state     = args[ :state ]
-    @top       = args[ :top ]    || 0
-    @value     = args[ :value ]  || EMPTY_CELL
-    @x_cell    = args[ :x_cell ]
-    @y_cell    = args[ :y_cell ]
+    @bottom     = args[ :bottom ] || 0
+    @direction  = args[ :direction ]
+    @left       = args[ :left ]   || 0
+    @map        = args[ :map ]
+    @offset     = args[ :offset ] || 0
+    @right      = args[ :right ]  || 0
+    @state      = args[ :state ]
+    @texture_id = args[ :texture_id ]
+    @top        = args[ :top ]    || 0
+    @value      = args[ :value ]  || EMPTY_CELL
+    @x_cell     = args[ :x_cell ]
+    @y_cell     = args[ :y_cell ]
   end
 
   # Identifies the type of cell class being used.
@@ -198,7 +198,7 @@ class Door < Cell
         @state = STATE_OPEN
         @open_since = Time.now
       else
-        @offset += ( 32 * delta_time )
+        @offset += ( 64 * delta_time )
       end
     when STATE_OPEN
       if ( Time.now - @open_since ) > 5.0
@@ -209,9 +209,364 @@ class Door < Cell
       if @offset <= 0
         @state = STATE_CLOSED
       else
-        @offset -= ( 32 * delta_time )
+        @offset -= ( 64 * delta_time )
       end
     end
+  end
+end
+
+# Contains color and texture data.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+class GameData
+  # Use this temporary method to convert the ANSI terminal color codes output
+  # from the im2a export tool into a Wolfentext compressed color texture map,
+  # used as the raw color data array for the Texture.encoding methods.
+  #
+  def self.temp_colors
+    # [
+    #   %w[ 245 6 6 6 6 6 ... ],
+    #   %w[ 152 37 37 73 152 23 ... ],
+    #   %w[ 152 30 30 73 73 30 ... ]
+    # ]
+  end
+
+  # Command reference for generating texture data from images:
+  #   ASCII character data
+  #     @see http://www.text-image.com/convert/ascii.html
+  #   Color map data
+  #     @see https://github.com/tzvetkoff/im2a
+  #     im2a --height=32 --width=64 <file.png> > out.txt
+  #
+  def self.textures
+    {
+      '1' => [
+        [ "...........o+++++oooooo///o``/+ooooo+++-//.`....................", "11zw4qi78w4z4hjro1j60g7mzxkas6vrqqamnrwrwc44dvl93g7vzb6xd2mnyuymzrwfcu2vuha2s51fkni3jsumwf979yz67j72" ],
+        [ "++++++++.--NNyyyoyhhymmmsh+`.yNdsyyy+o+:/-.`.oyys+oyyss+::++////", "12mvri6350xa3e6lli236c9cblveyi09lp4iyqjyrrdk2ud8za96f46dsodo742gi2eybv3jdtcvi7cn5wll0g0gdjv7e85w9asy" ],
+        [ "mdyhosoo`--Nmso//shyhyyoso-`./dysyyy+/://-.`.sdo/+ydmyyy-/ys//hd", "13osd4hl03jr47gvzr8xubzib94gy5a6oeb7ck4yahao3r2hvbpsnshwv9nxaom1yhnmwpd8ubrqihwh1bchjqa01oxaci11pj3u" ],
+        [ "dh++yso/`.-NNs++shydsoyhos-`.-+ssyyyyos+...`.++/+oyhyo/+-++/:+s+", "12kif8wywxkoa6h63vcqsu49ebici3c02ymzc7mwi0ewe2kunt43kjfzwj4tuvatriugzzk8wakgvb2n0nb90tearh4uj2vgwjy1" ],
+        [ "yyyo++--``-NNhssshyosysyys-``--::.......```..oshoyysoys:+yyysyy+", "12sp3lkmedyzgumy9dhme9tlztv4dby4xbb88czmmezhjcbe3twpdwbmojvuilcyradmjiw1s44jedquue299n60hciw54rqqfp2" ],
+        [ "//::-.````-mNysshhs+hsyoyo:``.-...-////oo-...+doo:+yy:+/+:+::/::", "12bdy9m0jpop02b8ild7ku3m1j1l8xv8m24h5ivfszzju2qila8hpg3p35nqsd7b7b8kew9gsb4b3po6u50do4ld58y6qmuumga9" ],
+        [ "`````````.-omNsyssoysyss++-.``.sddhddmhmds:`.-/:--.....`````````", "11inenr1pky6i648cy58jqo2z1fnu0l6j8yiq8zgbjzyfs9mzo7wtq6fneraz0fs8s00fr0rs9rzfos2h74djms1nx26d7gv942z" ],
+        [ "-.........--omyyhhooyoyy/-/.``-hd+oyydyso-:.......`.............", "11zw4qi78w4z4hjrgliref8t1dsqa8x2azlu3y7d52ayct66sujcuhk61fqisvjeqv3wty1qbo5wduv9nu1399a6uzhqr6jsiar2" ],
+        [ "dhyddhsoo``--hm/+s/y+oys++/-``-dyooyys/y+-...hys/.-/yhhhdyhhhhhd", "13ugjpzlznwj3v0xt6m5e3zbt8euxgk5k4o7jhhld2pd1ubsn74t2n481fpq6veljtvstgiybprol9f2gic69f8fcxms1usb7u9l" ],
+        [ "hssyso/-+.`--:yo/s++o/o///-.``.ys+ss:--....`-s+/:`-yhhysysohhs++", "12jp4ljbnrv0jck5hxqlocf9s2upjg0z58tlw60yj1ucsjw019tb62rx6hxytuy7yd0izgch9dqn0v8lf2rz3ihrwzo5ocmetc3y" ],
+        [ "syyy+::+-.`----..``````````````//.``````````+yoy-`-yhsyyyoyyhs/o", "g811unfumqd4tzkca8megxt1nli2ig5avp0yd4my6h88cgfskss5bfbno7ph1lckkgm0nutmpw3m34j0f9obymnnuer7ljwvr6t"  ],
+        [ "shoo+os/-.`.+o+/::+++-`.:/++++sdddyyyyyo/`.+NNmd/`-oyhhyyhhhyysh", "13fkovwyfs6blsj1qcw3ecoaemoj0y2eiwx21ef2lasmce004sl7axfx5t2f1t5477j558qw3y0792lg8vkyjovr2bbyb3t77xf9" ],
+        [ "yooysso:..`.hss++++++`--smyoshhhhyoyo+s/:`.smyydy`-yooshhy+ooooo", "g84y7v463mrsvfp7kbla49esj7z6ft04ct6hdr5b99fr9mpjugbzqcj0yvtvos3lx09mtt1ylj681iiqponb4ns1shg314vq0om"  ],
+        [ ":::--..````.y+/oy+o//`--yMdhhy+yhshhsh+/.`.sooym:`-.``.........-", "125m8bx3il9qkhf3elwmmctzs72v1sfw1zrkcmdiujcvg44fmjw6w9jeittdc6oh148dhpxsxqiozf1jz299e8ufn8c8av3xdsu3" ],
+        [ ".---://///-.Moyh+s/+/``-yMyhy/ohshhsy+o:.`.hMdNh-`-....`````````", "11oebco3k0em4g6whfdzsx0lhgw647a3r2al1br1eticdlnaxb2dgtgtatkqjxwagc79oswabt4vxv7oyydy09ubrd41dw6rkve4" ],
+        [ "/hhys+hhhh:`Mhdy+yoo/.`-sdhy+/ohhhshy++-.`-sNmhs-`-/s+sysss+:+.-", "12bccati52majqzq2f4lmih5luvnt0dtld94p1cjwucj08mx2nxsxnvym0358rndphcynif95cfiisxafn72rq0ntpulbbanyn01" ],
+        [ "/ys+/ysys+/`Mdyyhosy/.``-hdoyysyyosoy+/-``-sNdy:-`-dsss+++://+.-", "125lfq0uu1m7mvus72te8sb18yhyk7o4d3q0agt9ol5m8b4tn12tt23m01vqbp5gyjfuyb55n7r6jwfmplz5dxiucdivuzwsf46p" ],
+        [ "/syyysys/+-`Ndyhhhyo/.``-oNms//oyhyhs//.``/sNy/:.`-mhys/ooyoh:.-", "11zurhpalag7tu2d6sruvoxwx975tl8q78xgralejjfwif2bfkm7h9ezlnorscewhp3jn40d9q12vqklasqyyx00fxo0z83q3f8x" ],
+        [ "/Nhhsy///+-`mNohyosy/..`.-hNo+ooso/////.`.-/+::...-so/+//+//+-..", "11u58dwrv9npbx7fuoo29op6pn917a8xzrat3qcm8wo9wqj4pkcfbyvys62zo6zizm0lbavzm7a9bxudp8rqel0rx0v9puo4tgq9" ],
+        [ "/Ndyyssoso-`sNhshy+s+-.``--//--...``...``.----...--...`````````.", "11u4ey4594ofsv7m1azrkrajynzl912lcukc1pmav5a7rux5gpedd0fusevh9fa7d45rg93rglr68cv69bkxyfnwx0fhm84i4d81" ],
+        [ "/dyshys+//-`-Mhysosyo--``.:///////://+oosssyyyyysss+yyysyys+yo.-", "12baswqllgglyysn8ddambs8pbp4m3tn5salw9p1g0y648f6v1ta1el6dqfkx8cda1c2lobukirkimvkequ55lga9mprajj27ugh" ],
+        [ "/y+ohys++:``-Myy//ys/--``./hhhhhhhhohmhdddyhdhhssssdhyymdsys+:`-", "11ztyg073lxpo2fewdvveoeujvv37sz44jkef034yzbl6mfqudpa59j8mhhkkjt3udvgtl3p65pe1uudocvjefcgrhh8vzg4kv75" ],
+        [ ":s+syyyy+-`.-Nyyhysy/-.``.`yyssosoo//oddhsohdyhhhysssyhhooy++-`.", "11u4feihyqmvrbiqhcad1w8joxjravi87h77kps0kdcu502rzd8pwryeozx1p9qepjc7baptjxxg60f9w1v0nwi37s7oblf5c8vk" ],
+        [ "-ooo+/:--``.-hhysys+/-.``.`mNmo////+osydhdshhhyyyooyhhsdhyo++-`.", "11u3mf4smsoxazvt6duek3eqtl9lg3ymuci14tasbdk4o392k4rvrgl74g3ydbpgckdas0vjky068epacag0mwtoittl0tj5k1ri" ],
+        [ "--.......`.-.:------...````yNmoyyhyy/hhsdyyhdyohhdydyshhyyhs+-`.", "11u2tfqrynyf0jl18wq210oc70ippc28aueoxeiaz9e55ub7y2k988d9j927cwouyxoiwyosg2s7z6fz327plyhxuym438i7gi5r" ],
+        [ "-/++++:/-..-..`````````````++:----:-:os+oydso+yosssshoohyoos/-`.", "11u2tfr3k0hr824gr5vb43tllyuqejvydfzgd5ymd2vhhbk59mhs3grrjij7kq6ecclca4qrvszq3dddj6hp5cvmaa0sczzacpgu" ],
+        [ "-hhdhyyyyydysso++/////::::::--......`........................``.", "11zuifi1ju3dru7ux4y9z196j6e6e57zj93ry5jkuqznpfb3hczogrcvj122sh7bjs6a7takzey0r0l26ryb5nf2hicmhw7ls4xa" ],
+        [ "-hmdydmddhmddhhysssssoo+symmddydo.--.........```````````````..--", "125m8by8s6ohej0cqe0e3jl80b0atp4no95t3iil6xbbcaj3d69ainlqmvccg1acpkas765rbxzeefo2nqhwy2p0x0hnjkri648e" ],
+        [ "-hmmdhyhs/mdmmmddmhhyhyhyyhhdos+:`.--ssss/sso--+ohyo+oo+s+o+/---", "12bd50x0uxa6b6s2ir7c9movg20c1xqjhbh1ymv4vwx2vcxjrdzyk7a3thgrhjqw82cvaluwol2nbkp876nwvgaenhykpoq9urqm" ],
+        [ "-y+:---:.:::-:::---::/+/:------...``-s+//oshh/-soyoyyhhyyo+ym+`-", "12b94gkqdr5gfvj3oyefrwtwtjk9a8k5lg2nog1001cjqwgnko8j8pg9kbt1aa1ifgv0j707xajhsgrdlfgwp6cznyrqrabv9wj2" ],
+        [ "-.``````````````````````````````````.....-----.::+ooo+/o///++-`-", "12b94838g914ph1z59har63qtv331efo9asyb9uj24raq8zf4e3iwerkdv28s3k43kw91w62bbpssgel9rp8lt94iy4x01g9gstr" ],
+        [ ".................................................``````````````.", "11zuijk6y8y9ha8bsnns37r6gxjmawis71oxnpijnmdoxx3gv5hykv6ge3rg3ex43es19lcmn5r77d3t8o0e793wchkrzs76wjxq" ],
+      ],
+      '2' => [
+        [ "...........oooooooooooooooo``/++oooooo+++/.`....................", "11zw4qi78w4z4hjro1j60g7mzxkas6vrqqamra6wzeifvze39bprt9djoxmtlhpfi5x8kmozoqal58ks6a0myjm47xe7xncx2j8u" ],
+        [ "++++++++.--NNmmmmNmmNmmmNh+`.yNdshsysysyy-.`.oddddddyss/////////", "12mvri6emnlp4k8pi5q6j3i1a0fqw72fzp98egcn54l7o0vq8ybo9v9n3av4liy9mpj0tx1kcnrkasbtsoluuxvh8bt3hliv4pv6" ],
+        [ "mmmmdhoo`--Mmhhhhyhhhhyhh+-`./dsyyyyhyyo/-.`.sNmdhdhmmmddmhmhmhd", "13ose7fqntyf8lto5oi22ulesdnm4f51qg0znp1fsnxeaq839cu65zmrchvtqwiizuy8bn3souy5ismkv3j6ev3kfuvi8etz277e" ],
+        [ "dhyhyy+/`.-MNyyyhhyysyyhy+-`.-/syhyyysh+...`.sNdyyysyyoyyshhysyh", "13fmaqm7mm2numa24saomt7ba07bgzejkzciemmndh9p6umifjnstai0i27yu0pate9jqa5j363vs9sr21f80k1x40ir80w30tmh" ],
+        [ "yyyyo/--``-dNhhhsyyysysyy//``.-.:.......```../NNsyssysysyyyyhyys", "1345asifp0mt6kn71ddniq9l26kvqqsm4gghrs0hvl16c4a10u84jok78r9ziajhgkkh5813sadfprgulintqc4i6pc47lae3sae" ],
+        [ "//::-.````-oNyyysooyhsyoy+:``.-...-:://++/-.--mhos+s+++//:::::::", "12bdy4caxrvc4tel6mqhtgkf7dvmaxq620g8kf7njwt46y9ehjnomfhu1ox7mw4moe179lil9fiejq2m3n7k2faecvluxuced3ox" ],
+        [ "`````````.--mNsyssyysyssyo-.``.sdmNmdmhmy+.`../:--.....`````````", "11inenr1pky6i648cz72nlh5jldzydodhkedqbtj90wbdpfr966yvhkkju1012o1tso66kiezy3qz2rh4lkklp4764zp8rgldqej" ],
+        [ "-.........--omyyhyysyoyyy-/.``-hMdysysysy-.`......`.............", "11zw4qi78w4z4hjrgliref8t1dsqa8x0xjd3u9by91jc9kwzdcnhssikesvabww408n5e32113huk5drx3u2i361054fuz7ihh4e" ],
+        [ "ddddddhho``--hmyyssyosysoo/-``-hNyyyyyyys-.`.smNm.-/yddddddddddd", "13wv11ite6j54pp00s42j8t505kj3eaclz6ssjly6ubl20r01mq89hh5ov9vr8ad5h7gc44t72xqi67apia7taekn8wrbk1wv75l" ],
+        [ "hyyyyyy++.`--:yhossoo/o///-.``.hhss+:::....`-Nmys`-yNmdhdhdhhhhh", "13ld7jlzh3vyg0rmesukm6om9505fkyaj2sftjpennnko7nwtdp1slb04rttoy1ckf9pn2rrh2r5ugppoltkrjauxq0qzs0m2ad4" ],
+        [ "hyyyyyy+-.`----.......`````````//.``````````+Nhhs`-yNyyyyyyysoyy", "139uxyxkvx4fwn04z4saj167gwoswlocisxmi1e4doabx8celn5m63bmvws4l1rwvoqtrgjlqiurctjjvmzx50o564r57uyvfjeg" ],
+        [ "syoosyy/-.`.+ssoo++/:-`.:/++oosdddmmddhs:`.+NNhy+`-omhyyyyyyoosy", "139tu8nupw8zp2rp3594toqij39dv53erlxd2grvjffcbfd5a39ynljw3kslk5yqh4r4spvasqi7uvipil4ove4qk29weo8g6prp" ],
+        [ "yyyyyso:..`.Ndyyhhhyh`--sNNdmhdhhdhdhhh/-`.sMdyy/`-:hos+++++soys", "1345ncv89jfv6q6qzf61u4phhf0dtlolj9obypwxek8ugfqwlssvkjh5uxh3soa742ebvvpbc2xcqotkj1tz49fbhamvcyl6hq0m" ],
+        [ ":::--..````.Nyhyydsy/`--yMyhyyyyyosyhsy--`.sMyhy-`-```.........-", "125m8bx3il9qkhf3elwmmd1jtvyvtd390yev9dtpyi9a5k28r84652iwzdjpsb530eo245uzyj0lsgdeoymu1ppv0l4959heiv5n" ],
+        [ ".---://///-.Nhsyyyyo/``-yMhsysooooyosyy--`.sMhhy-`-...----...```", "11oebcp8zfjocvcaaro53gmend5gttgkjv4akp6ymy2m1qvv4yartv5btx6dk475g9plbdvoo72iolyahikb4vu3qxitts6hr8x8" ],
+        [ "/hmNNmmmdh:`Mhhyoshy/.`-oNmhsyoyooyoyyo-.`.sNyyy-`-mddddyssss+.-", "12bccdtstayipx4b1djgxw9mqw5g1hzcktnfrculibnhz1ovu44ydc996yfmbile1ogn4ww861yftao00o90crrse492j8nbgy5t" ],
+        [ "/Ndhyyyhyy+`Myyyhyyy/-``-dMhhhsyoyooyy+-``.sNyhs-`-Nyyyyyyyys+.-", "125lfszh8t92fn09pnb33i4ttacrs2q8o08uk0zzj80zid06awai1s13jz40hbyycok1z6e8jja7g7tgsmpchk9ne90zc6fuo2r5" ],
+        [ "/Ndhyshhyy-`Ndyhsyhh/-``-oNmhsyysyyyyy/.``-sNyyo-`-mhyhyysyyh:.-", "11zurhqehkqw4nm1ta6hwswr1le3lj4smvt9vvjjovfnc9e6put7fnndoyvcnszpogx8o2wohl7to93oshr4ueetkebsfs9qsmb5" ],
+        [ "/Ndyhyyhyy-`mNohysyy/-``.-hNhsy+s++//-..`.-/+:.....so/oo+o++o-..", "11u58a634s41nys58mp3b6rzop5gmmwd06pty9lr07rmt5ex9mkxps52hz2pl8gpv1rbbpw7daouo072kvbmm6fvurrp12thmynl" ],
+        [ "/Ndsyhyyyy-`sNhshysy/-```--//-..`````````.---------...`````````.", "11u4ey4594ofsv7m1azrkrecbv3drmn8t2ybj2lr63xbmr3vjwxu9cdeypcsxijoqyscezuzvx0z49yyiuiti254zb5y0hi6ex9t" ],
+        [ "/Ndyyyyhys-`-Myysoyy/-```.:/::::://///////++oyyyyyyyyyyyyyyyyo.-", "12baswqxeqra6s1z9rzt6w7q7w6rl0o6hcqq7587eecu0cl6yuyrx7izplrafkbzz21co6wa7ftjdoj0xgcjf6l5n3tz91kebbox" ],
+        [ "/Ndhhyhyy-``-Myyyysy/-````ommNNNNNNNNNNNNNNMMMMNNNNNNmNNmNmms:`-", "11ztyiafxd9qe2i6gzn88kyt64iwav9cj7b3yyyuxpa3whfapgd0m9ttk3vneokgxrapl0xhx8jf16riuwnmi7ccp096psr09ecx" ],
+        [ ":mhyyyooo-`.-Nyyyyys/-.```+mNdhhhhhydhhdhhhdhhyoyyyhysyyyhyy+-`.", "11u4feiieg54d1zzwpjryur7pkoxitov3zact4skf3jy24cqr31baveh3wc23hmomxgwlriiz1pem44e4uf5rgez6ra00zr9dvxs" ],
+        [ "-yyyo+---``.-hhysyso/-.```.mNmyhsysyoyyysyyhyssyysoyysoyohsh+-`.", "11u3mf4t2xq8mo1cs6e1qzn4lgthpj44kutohyy2abumh5hkxxsqgxs62ssjzc3a3rrk4ytghdcjirarlbjnxcq8v53ohp4zho1a" ],
+        [ "--..`....`.-.:------...````yNmhsyyyyoyssoyyyyyyyoyssoysoyyoo+-`.", "11u2tfqkfah3va6p2ibh5o03obp4tccgwnky9xe18mt2637pb9h15v41ub96s5bcd4sasssmamdk0cg5zu7i407tjz9otkmmdckv" ],
+        [ "-/+++++/-..-..`````````````++::-----oosysooooooooyoyooyoooos/-`.", "11u2tfr3k0n525x7ncmkrktaki0mr2cci7psc2rcxifjx25yjicw6xihr74rr4nwusb1wkqudb0fzl1yxyz9v1j4jds4gr3psycu" ],
+        [ "-hNmmdNNNmmhsso+++++///:::::--......`........................``.", "11zuifi1ju3dru7ux4y9z196j6e6e57zjg0v1gk0xtr0xcialev4dywejdm9dqigz9ap31sx4gwm3jwhak887barpjog1fnbjuni" ],
+        [ "-hNhyhyyyhhhmdmdmdmmdmdmmmmmmmmdo.--.........```````````````..--", "125m8by8s6ohej0cqe0e3jl80b0atp4no95t3iil6xbbcaj3d69aiyt3s1l6wlhc6edgn98gq9mltfolyymq7vz9mkvqxsug3s32" ],
+        [ "-hmhyhsyyhshhysyyosyssyshshshhh+:`.--mmmmhsso---ossssssssoo+/---", "12bd50x0uxaafx3sgh95lph9x3px0s7j3j28e7ig60bhcy5vwi3835kdmne8w6skyoyu5p3m5vys5f19fsztwl6oz3i9qxbdtre6" ],
+        [ "-y+----------------------------...``-mdddhshh/-ymyhyyhyyhyyym+`-", "12b94gkqdtfcz8uqaxqhylqjp0iy17y900v0x20rzddm3psjl8tlmmfxz3n4hz0vnafrpoobxhgm41ygtwbxlcz6fb59n4ngsc1a" ],
+        [ "-.``````````````````````````````````.--.------.so++oo++o+oo++-`-", "12b94838dll8nv4g9qq1joujhu7ulxlkv44lsjb6tkxgbppnqympkjk6ro9yobhpacej1wyvjnm398pfd6utfmh2i9hxbvwarbvz" ],
+        [ ".................................................``````````````.", "11zuijk6y8y9ha8bsnns37r6gxjmawis71oxnpijnmdoxx3gv5hykv6ge3rg3ex43es19lcmn5r77d3t8o0e793wchkrzs76wjxq" ]
+      ],
+      '3' => [
+        [ "................................................................", "11zw4qi78w4z4hjro2l051yff0hf7vo21ve6xpzuutm8atgmec1i0t1ei58qbgq1fl4xtxlvydxjw531pqsu1eab4unrglwupn1q" ],
+        [ "-NNNNNNNNNNNNNNNNNNNNs/`-+mNNNNNNNNNmy/.--smNNNNmddyysssssssooo+", "12nd17q37b36r8heu6942e9l08gznms9eqocvoneod7lu8sk06jdfsw5fgdq624a95oj0gkcgrl6x8nncjkqkea18t0b9c9bsiy8" ],
+        [ "-NNdyhyyhhhhhhyhyyyyy--`-dNhyhyyhyyhy+-.--NNhyyyshhmdddmmddmmddm", "19ny2v3xvqll2u0ow19c02b4yy6ryay6hzhl70nb37yk164ktgplanf5mwfskjfs2kq94any27e28fz8tl33z613o4484wiz08g"  ],
+        [ "-dmyhyyyysyyysoyyysys+-`-dmyyhyysysyy/-.--NNhsssyyysyyysyyysyyyy", "139w7dblzxqybc7fqntrwwlypit77jnu6rsq1ivbbqli2phsp8f1rejgig7ze50dltb3332lxcivnsrbogp94t3n5cxbxjmor6k0" ],
+        [ "-smsyyysyyyyhyyysyysyo-`-dmyhyssooysy/-.--NNyosyhssyooyhyhyhyhoy", "136ngz6sd74xl849i4gc3cpkieljpbs6qzzpmz0oab2zt0qpegds1qbtevg9vg61vv4fhu34wl0xrvcm0kmzft00q6n6skav6r5c" ],
+        [ "`/myyyhyyyhysyoyhyyyss-`-dmsyyoyyyyoy/-.--NNshyysyyysyysooo+++++", "12mwklnepb2zp906ehg3b001zjy6bip1e22ale8ml0ofmaytc9b7ysgf5i5uodflujkhc37lwgsx83wkvpz0c97c20umjdx5xuju" ],
+        [ "`-y/oo+++oyyyyhyysyhyo-`-dmysyyyyoyyy--`--Nms++/:::-----.......`", "11oebcoo9qdw4eeu0avssfce0djzblbmimjotfy2jlcstahgr1inel52o5chywtt3nr2iduoz0btr9fgkt5qtp7613e0rdd5nqwc" ],
+        [ "-`````................``-dmysysyyysyo--`--o:..````````````````..", "11u4ey4594ofskpnwv3ldkkbnb99vm1jgpq8szuws1gqnju5493ywf3oqot2ffkuhm9pwy02dwyx27adzd1qnpg1pysobv9dvbhq" ],
+        [ "dhyso+/:.......```````..-dmyyohyyosy/--`------/+ssssss+---/+yhmm", "142lxi7j72oi9r4e578tucamtaj0fs5kscwtww8dgurnbxp901y54pq2aupb1za5k4olqybauvjlgv5usaxkz7ry8z16qgkf86ih" ],
+        [ "mmNNNNNNNNNNNNNNNNNds-`.-dmhyyyysosy:-.`--+dmmdmddyyys-.-yNNNmhh", "13j2anp0zy49u5btw2kf5pung2adasb2802wy730yxxm62as1ozli98gnor9ny8kjcu7n14ut79mlelkog1i1gicv2cniepo0rgn" ],
+        [ "yyyyyyhhhhhdhhhyhhyy--``-dmyhhoyyysy--.`--NNsyhyyyshss-.-mNmyyyy", "13flhvb8o0cdet0a3x7ap9d17grh7pqmbs0gpk7ho3j3zjtccwub0etk9zmm6z4zaxx9slm89gak2m4ow5kb1h9nbre7ncyx6xh3" ],
+        [ "syhshhhyhhyyyshsyysy--``-dmhyyysooys--``--hNysysyyyyyy-`-NNyyyyy", "139w7db1j0etn7763xmtfqayh87urh8t6rk1l79mmrajl0exnp5l4pwwx3oz2diur62s03xl8gqnf3c54nzqb282hcmh3rweplo5" ],
+        [ "yysyyyyysyhyhsssyysh--``.dmsyooysysy--``--:Nsyyyyyssyy-`-NNyyyyy", "139ve9v6q73fewjjlm0iah9w28qoupu0vj1xdcajucculwhsozwfx4o9no1cacalqkzqj45nzero1hrqm5njgttchghbm7idaad3" ],
+        [ "----//+++++++++++++/--``.dmyyyyoysys--``---d+o+//......`-my/----", "12bdy4cb3muxam8unrdhupp09jsj9f8yvmriebnoel0fn0hh28opvpxtzsmpvpzv99i3ftnfz2rpnoi8x69xt2kuh4goei191fcg" ],
+        [ "````````````````````````.dmyyyyysyyy--``---`````````````````````", "11cwhytzv4o94ewz6hysmt7jdpbi1e63z0v67mg87pjgh6m5n9qnodm6rlzmanhtvsjn1uby0333ubc3t9gv77tqnx564av25v56" ],
+        [ "----.................```-dmoyyysyso:-.``---/ossssssssssssssso`.-", "12bcbll1bw6xmzkasccx6kkd5gbr7cv6u6gz64t79rjynrstey8krph9zcwbwkcelnkb1ezfegjpqn4pivaqgksd63kq6gbae700" ],
+        [ "--smmNNNNNNNNNNNNNNms`.--dmyoyy+:-.````---+mNNmddddmdddmdmhs/``-", "12bapmgg4l877vfnkket5barzal887hdqvpzbnm3whytd4m4d7dm94pltiau7httzbqlji6wldns9on7493rt9pwgf7cy6xkljw0" ],
+        [ "--mNhhyhyhshhsyyysy/-`.--dmysyy-.``./sss--dNNysyysysyyyyyss-.``-", "12b93jk0fro02dzu9p598qtdajfnui6ztuzvjt6tzfinzw7phuyiq4yq9aceee2zzq80aty0r5ecaeitfqympo3km6jc4l1gdxio" ],
+        [ "--NNyyyyyyyyyyssyhs-.`.--dmyyo+-``+Ndmds--NNshsyshyysyshyyy-.``-", "12b93jk0fs2szwrw7c4oh4nybgczu7qkwoe305fcm9dtfonwmbsp8eyk9arp2vmxrjnzlauip0khlfj2whpxqw6slnf2pjs8vn5c" ],
+        [ "--msooysysysyshyysy-.`.--dmyy/-.`:Nhhyy.--NNyyyyyyyhyhyyyyh-.``-", "12b93jk0fsw4jppudbbbx1p45mzwaekxd616xp1092kq5ywnto99gwwrcgeqx8evbzj8yrlvffd6wzqksxn8u6oyc3dosfdpmeb4" ],
+        [ "----..:oo++++o++++--.`.--ddo:-.``Nhhhy/`--NNyhyshyyyyyhyyhs-.``-", "12b93jk0fro4747s901bpzghg4623mnjes5tvd4iegv1wqjzbfm0ozqydoejeun50ekhnmic2aojuc12d2molyr1jz8icgiun84w" ],
+        [ "-----`````````````````.--do..```-hhhyy-`--NNsyyysyssssyyyss-.``-", "12b93jk0fro023jdak5jl9ozxp1ovbgu799pe111ilfuxaexmme9xizqssfov3h7118djt7gh6kxpg1vuu2dj48cqkfklztbb8xc" ],
+        [ "--------..............-..`````.--..``..`--mho/...............``-", "12b93jk09vvy8qggtophe1f8ywm9pq5mae00e66qbxhk9n50exzxukpnaxovlcl2upwxcaxw49qu8ee5k9swyd6lx8u78n8wft2o" ],
+        [ "-dNNNNmdyysss+/-----+sssssssssss+//-....-..```````````````````.-", "12bbipsu8jy9hfm8bx24yjowqi452wo1qjaa7a1dlwp0nkz200cwfryn1gsoxr0nje2pmbmnzbj2glbro7wpz41o0trtgwx3260g" ],
+        [ "-mNNdhhhhmmdhmhs-.--NNhdhddhhhdhmdNNNdyo:.-...................-.", "11u6u4fusclemm8ut0psu74al3gbdzxsoj35l2c7mc5mcnxizbrvy7ulrflgty0r0k6yyolehkfqv88zmj2dcl8v284aiazgiupc" ],
+        [ "-mNyyyyyyhysyss/-`--Nmyhyyyyyysyoysyhsyshs-`.-/ymmmmmmmmmmmmmd/`", "11d2zfdw0ne6zd4nx7hhb4q1jtag989q2xf7lkrd91bb0b11n33bpgtbbjlh5es70hes4u8oys8ah3g3p87kyaqx3h0kieyes6wg" ],
+        [ "-mNhyhyyyysyyy+-.`-:Nmsshssssysshhyyyhyyy--`.-hNNyyyssshyysyys-`", "11d1d45obmjsdlrb9p3l0bup1vcbx4uuvegdhe1tp4d4epe7xfkk96bgi63oq4h680rspzzhzpms2nozwufmjtu8xz58bw3zmynk" ],
+        [ "-mNyyyysyyyyyy/-``-oNmysoyysyooyyyhyhyhs/-.`.-hNshshyyysyyyyyy-`", "11d1dcb4gzrktc7n5ostyjg3qq9la3gc0mos3x9ehbjlor27alir6sjmnvmnj5qyorjjerqyxv55ot4wqll2tydstaibec6ahrlc" ],
+        [ "-mNsyyysssssys:-`.-mNdshyysyysyyyyyyyyyy--.`--hy+++ooo+s+o+oo:-`", "11d0ry98eobnko7koh2kjb0rbywdat70ayfd655ybf5h2ux7uk79ujcvueeyvylsigfm45dw7lcmv9z5l31bf9j0yhkhei74r9bk" ],
+        [ "-mNyssysyyyhss-.`.-ms/-------------------.``-.:...............``", "11cy49vazluwphbbnl1m6pkj3c6suz9wi05bw550gyzaqvj16syjymasmg9icmef07wvhk83bs0av8ekcospt53sxoszyek3mewg" ],
+        [ "-+s::::------..``--````````````````````````.--.````````````````.", "11u4ey4594ofsv7m1azrkr2z89s09qrt5s6snm4fv5w678jgd27l49ofewcviri0r78no4620bt4om529p0fh620mqvw3wx9bsvk" ],
+        [ ".```````````````````````````````````````````````````````````````", "11zw4qi78w4z4hjro2l051yff0hf7vo21vd7rs2jcvq2qsfcqau360r1sgbr56f6non6cszv4bkvm8t4inykmt3mf65x0oroxre6" ]
+      ],
+      '4' => [
+        [ ".```````````````````````````..`````````````..````````````.`````.", "117qndh9gqjxcehftq4w9xipftlmmvhacvl9h5zsktmso1l5m8s1vwkkksztriuz85igodk6vvmg8plf6hjmcga6xg6ogkau7soc" ],
+        [ ".``````````````````````````` .````````````` .```.`..`.``` ````` ", "dqr4df7x290j7trdu7pxgijw9zkt39h6hr1kf7gt2ks64xoz7qg534hyvfukjidptfk41ofssggr2a6eplm97gkagfhfzrl62"    ],
+        [ ".``````````````````````````` .````````````` .`.``-.`````` ````` ", "dqn11gltrq3nib2zbhp0iw2k0fropnrd92kntwv2zlgxiw5e7cxj2404uoevl2mj26ss6yleqdwr5m7zdlmabqr41o6ppxnmy"    ],
+        [ ".``````````````````````````` .````````````` .``.````````` ````` ", "dqn12ihgro4oqiwulngvkmlv1vt6uqntlh59w30tlpsd1uedfkum195dhflxlpov2ur5wo6vo6y38cwg4uguhhtjb2i2lmf3e"    ],
+        [ ".``````````````````````````` .````````````` .``.````````` ````` ", "dqn12ih22v1o5dzqtp9gai8c5kfsr5wcgd494sgdav5jkuk2gk6g2jesdy8w3ypgdkhnmuur8qewns81c9ckbkq64xnzzp7u2"    ],
+        [ ".``````````````````````````` .````````````` .``..```````` ````` ", "dqqwck1n5peabbp96ai9vjgz4ok9x4rtun2wsyt2ustdyvdlnx2z9t250cmwnwgyzq81mr0ehjstypahazvsc97dkwalyvrhm"    ],
+        [ ".``````````````````````````` .````````````` .```.```````` ````` ", "dqmtmcv1or4apg5j9npo0ygju2vantnb359rfud3b8p8jisf4wyxg2pup29nx81fzusbtkuco6jx0vf53p6eag513knixy7e2"    ],
+        [ ".` `                         .` `           .`.``````````       ", "57idlixyowbzbdwwgiof2vjbl4soxiby0qj6tuisz9vrzhrb8g0y9sgeam7qq9u0xawn2p7b9wjisw5b0nx283woqzt4e41iwa"   ],
+        [ "````````````````..``````..``````...````.````.```````````` `.....", "31799ip6bqey9j9cnoqykb33ogr8r21z5s9jlgjyedp0pqrxuti8l17yc8v8pv2avw1l60gbne8gdnsuviwiz6o107hociikbv7"  ],
+        [ "``````````````` .````````````````..````````` ```````````` `.....", "31799j9ta5fogk3xe3mbigcozs0sk19xi0sep5g7zpcl6lo20o6a2z4zkx9ycthpcn5rhmrekigusufubqn5r87blmaveop4phv"  ],
+        [ "``````````````` ````````````````` .````````` ```````````` `..```", "31795fz2dfc8v6wigpyz9xrdcinqxkqd256hkkb08qxu2zc7ug949p29qg8y9mlzte44o4an6k9egtxv1nhwz61mnrm1jnhijv6"  ],
+        [ "``````````````` ````````````````` .`         ```````````` `.````", "316g629qvtxd4p1h3d69t0cu9r6gqvxyv5lsh0aqm0x94li1q2zvqdfuu9guq1rbm2g2py70k66i5ywqevbyp3d5g2aopspcff7"  ],
+        [ "``````````````` ````````````````` ``.`````` .```````````` `.....", "31795fz2d0nfs6bdkpym7obias8cd471zqdvetrja59cwu69kkdzdzc39gslmqo1luceaemxedmqlgquh8nftajm46h97hhyuc3"  ],
+        [ "``````````````` `````-``````````` ````````` .```.```````` `...``", "31795fz2d0nfs6bdkpyckc1xdrqe50tujjhsxplpri2ynsb31x6wql6cr4mkadgre13jmkz67818ofgwcwdznpcz0wngul0598z"  ],
+        [ "```````````````  ```````````````` ````````` .```````````` `....`", "31795fz27b04ly3h3x00bylb6a9c8cb9qovz4lbsjl7qwf59zaobpdx050ex929g7rstf88feh955xnatb5bxtn4yag56pyz3te"  ],
+        [ "``````````````` ````````````````` ````````` .```````````` `...``", "2vgckm81lfrkgfiodw6seddveni8jwselv1ph5dvjurn11nsn7wmx60pc2jags1mbvdhuaj5nsmmw35zf9r0y3kz0ccthx7bgnm"  ],
+        [ "``````````````` ..`               ````````` .```````````` `..```", "mzoh1pt3afqb7fi8s0ga1l25mx5qh8q7no9sh074qvbmwr3dx84gx9tupnj87hq50wbtsj6ns19j4eb8x5yr7uu9aquv6vwpw2"   ],
+        [ "``````````````` ..```````````````.````````` .``.````````` `.````", "nay8dka2x6kpd4snl7ur463673llxwm44xgi0xa20nn22n48mbhme1koa15lyqkwm8mxag8f3pljdpy5hjwfwem9hejc8h8078"   ],
+        [ "``````````````` ..`````````````` .````````` .```````````` ``````", "mzmrw9glgugjszb0roii1z2o42pp33bih2g5r551mu0zx88sykpq3nusj161jfnzp4o54591szpviu9pqnft1f4oo2ozuzzyf8"   ],
+        [ "``````````````` ..`````````````` .````````` .```````````` ``````", "mzocyezf0769uyy2d0cpilhzx0jwhclbd33lsatap1q14l4irfz0gk4lc8opzu43sarqs8occ8fwmx5ji34c9aft482jw64ah0"   ],
+        [ "``````    ```   `````            .````````` .```````````` .    `", "1175l9wy0oucdrkjcedacxr42kl34fs5v2zn0s6z68kj4g6jymo0r5kdkmwth1ve5wuxll1u06y143l7fhp1f99nq76hib13qyuh" ],
+        [ "..```...```.```.``````````.`````..````````` .`            .````.", "118141c3upgkmk236795ec0axh2fsriuermlxyb8gjushn5d44vhr03mqk5mohbu7z02eebx6lilvlgrxbxny4l0u7uhhqnff9wq" ],
+        [ "..`.````````````````````` .````` .````````` ....................", "118141c3s8xyouuopcxqg00nee9k08hv6xgsm09o2uz5jwp5qswzwm590vt3qgczxl4nvy7cumxgz8clk0huz5uzeftsl0m9b46i" ],
+        [ "...`````````````````````` .````` .``````````...``.````````````` ", "39z6swnx3idect794xcgnk583npkgati060bs5d8cb1cc5p4mw7wmzr50tfcnvujk0n2s8mebxj6rxiq4xaaq28336kbv3oq2"    ],
+        [ "....````````````.```````` .````` .`````````` ..```````````````` ", "dp61lz5zahfnhs5cugpipl7ywly2ytn67g2i4yn4yn2pd7pevy4vargq1zjop5vl13unvll9be3pz7l7tv8p9cn3z0h8s2z8q"    ],
+        [ "...````..```````````````` ..`````.````       ..``..```````````` ", "dqn1m3ek6byixzv4hm6lt5ds89ft52my2dqacklr5yo639yvx60fkgdkumkt96h92tid5e3qf3xkw710oin5zfddwrakpqp62"    ],
+        [ "...`.`.:.```````````````` .``````````````````..```````````````` ", "dqn11grjn6yap6zr4cbcyd457pwtbtc1eb3rp3y5w2yboky8itkz7yirqlmdg3ybsax5r9l3jr6w30thb3atycq4k5pp73rvu"    ],
+        [ "..``````````````````````` .````````````````` ..```````````````` ", "dqn12ih2b4ryg0c046jd6wl8yr4n3qjit8qw5pecogz7owcfotwgrow50fhz6n4unuvse465ed9p03u00he9zn4atfvyq2y22"    ],
+        [ "...`.```````````````````` .````````````````` ..```````````````` ", "dqn12ih31z878x0sh9j55pku2npmeowx1gorj8oldnpe646d7tj2g4r6c9m605iry9bfyvz1bw6tq1mv0ei7xa6ffnhvt00dm"    ],
+        [ "..``````````````````````` .````````````````` .````````````````` ", "dqn12ih31z878wn8fo8h46r4mdbrckjk48k1e4hjmz5joueuys2krvi3p0pvqls649ymsien4pbkjmwndcjn3kour0tc63ppm"    ],
+        [ "..``````````````````````` .``````````````````.``````````````````", "112b0fw234o50ftyy09pnt6451bwdlcnzo5qhx47uc3msoci4hf3iwjk9t5z17517z4xa2rsqnrxadynhety7c1csrqj4g6inj6y" ],
+        [ "::-----------------------::-----------------::-----------------:", "11zvbn173kjmavw1qd4e44usxwbfuzzp446bj8tqe0u1b3izrj4uxatpxq98qzhdcsrg20lufodh5lxbjyclh07yfaw7h5y2hbla" ]
+      ],
+      '5' => [
+        [ "ssssssssso/-:::///+++syy/:::::+++o+ssssso+osssssssso++ssssssssss", "lveets0udnqkkzxsxk2cb1lmrvxs4bnrxosrht14ltqdrq54ndcqjg49fu5w7rtgocuynh50zx0g7y2j2nlwiheo5qdc27b9uh5" ],
+        [ "sssssso/---::::///+++oy+//::/+oo+/::++oo+yssssssso/:osssossssoos", "lveets0udnqkkzqe5ajx7py2yxruhjqz5mezz0k6qvy2y7mpo6mvrzenn1i0lm4n0yx0bwxa1mw7z45tqe7ahjhd28k0lxxhbih" ],
+        [ "ssso+:::::::////++++o+/+++/:o++/:::::::oysssssso/--ossooossososs", "lveets0udnqkkzqd3r2fjoh3e970x0m2k768ij1kkzpbfc14a05qp30engg9ii5zrp35f9h3i3vnz8aniti0xyb2sc8n25uubux" ],
+        [ "o+/-::://++++ooss++//+++o+s+/////::::+ssoososo/-:/::+oooooosooss", "lveets0ub7loc5exxyl4fwp7aimh7bd3es3fwa2bfmdw2o3fev1vd8gsmaqvl7jtcxfz890oon5k5geh42sk0oyvukatkwjlv2b" ],
+        [ ":-::+oooososs++///++oossoo/////////:/+soooso/:/++/::::/oooooooo+", "kwwzctiqo06d5si1h5r1kzipv4x927lzngg9ofrcc9hxr1tfmdu0bos320o4bbwtiyem3gm9crra0675e2ltss77rinxw4q2wda" ],
+        [ "/+oooosssoo//++++ooosso+/////////::/+//+oo//++oo/::::-///ooo++::", "f09h9oy5bszeszchdodjzgt45pl4ou6ayq87fdnp0zl8b1vgmgt2uimrmkjpi3cqduatwqvi6dz4pwg4kfxi182fc9m5tc99z6n" ],
+        [ "oo/::::/o+++s///oosso+//////////::/s+//:/+++ooss+///:-/:-:///++o", "lv9k8da8vkf2aagg0cmbzesn5ybwvurhlz9mgt7wfcki49aphr4c1gietun9z7mv4lekonx1mx8qtb3l0w9beqqez6ruvdjhz7n" ],
+        [ "sooo+/::++ooos+::ssss++////////:/+sss+/++//ossssso+/:-:+/+++++ss", "lw7dixjcz2ydfen018diazj7y3jucsa0itvriw5sazc4wpzac550i0rodi7jmxxc06xosd2lwr8sckn3u2a460dlymjdcuijnux" ],
+        [ "sssssso/+++/+o+/sssssso+/////:-:+sssso+/+osssssssso///:/+++++sso", "lveiweoojndiv8aon3zsuxhoc7wx0zcp3j6241lk1lr2pmesda02tfkjqb8tiy7uwrgkvuachzh6k3g1qxrrsrh7mo07gtezond" ],
+        [ "oosso//++++++:oososssssso+/:--/+osss+o+ossssossso/:://///++ossoo", "lv9ky2fq306q12pmlsixxmlhy85mgl8d3s3mpfsphei5rcxrqs52ypacrg4yqlly3hdir1chfs1egtd8sueg2i3kd8buyosusuh" ],
+        [ "ooo//+o+/+++os+//+ossssss/-:://+os+:+sssoooossso//++++///+osoooo", "lv9kxhvtwhpzwucioiiomt6fks5kn9v0y3o0hpyouhk810sohqj8730xcwcvwghqz59c4po7n5bfyxt2ogb5uhwz8qm7qcmvssj" ],
+        [ "+//oo+///:+os+/////+soo+://:::+//+/-:+o+o+o+oo//++osso+/+oso+o+o", "kwwyo9ps7lxw4o95l7h09efd1d5v4fpvtkntjywfhy02f5yxcibj7d11bwge4y16bb492jlr9nv2r1ccqevc7g8tyh3e9s0lldv" ],
+        [ "/ss+///::/so+/////:/oso++++//::+oy+:--:+oooo//++//++os++oo+++++/", "f6td880ngmz5g7cvasfyqukt3wmhfompjp66edb1uiyumz5f6ko4gmq588hmko4qus7vk70gthrhdbnhiskpwmtbcd3r81fpkyn" ],
+        [ "sssso:::oso+/////:/ssoooo++/:--ossss+:-/+/+/oo+/:/oo//oo+/+++/+s", "rld1m9kyage1bcrf3b3o98j5nizy6pauhuxvp5n4ccv7aj6zi7gbdamehj55xyjrem186xhkco5y9wda0y7d9qwj63memhfljn1" ],
+        [ "soso/:/sys+/////:/soooooo+:-:+o//+sso:///+oso+////o+oo+/::://sso", "lw7i9jagk4e63be8l3m42hhcon59wppvq1tc5bbzc6rvoou9gpa1u55t0nye485wlunz2dwgztelj7r7qhvdfc40mzainjy9v2h" ],
+        [ "ooo/:osso+/////:/sooooo+/:/+oo+////+//+ossyo+///++os++/:::-/oooo", "lvee584y3creritid1u6m3vggv6rbkt8lh8cmwtxw0gvxw5wd0opzn7bj95a9e87fazxghssmaa5c0twa02laz16un6om4h2nb7" ],
+        [ "oo/+sssssoo+//:/ossoo+/:/++s+/////::/+osyys++//+ossss/-..-::/+oo", "lvee4ni2w7rt8jobi9ftdgs8y1w4g8cl3up7gaqc1wv0grlopdujgcxmnex0qs683ufoxwp2f5yrvelc7mepwpyx6xfj21728p5" ],
+        [ "s/+ssssssssoo///+ooo/:/+ooso++///-:/+oyyssso//osssso-..-://:::oo", "lv9g1jvamkgpcoczy7pditorr5ltot238cvor9ykdg7vx4hibccf4aaawjhx5042ptrh3k19ezhm3vhf81uv5vy8i6coltoofbd" ],
+        [ "/osssssssso+///++/::oossssoooo+:::/++ssssss//ossss+-.-://///:/+o", "kwwukybaxtcaa9kyapyt8mcjncl9x3r5v809xmsca2jbuc2thpgkrr9rgupg81sgkrm4cikx1t58rb61q0l1vjr85cw3h9s7ihr" ],
+        [ "-/sssssso+///////+/:+sssssoooo+-://oosssss/+sssss/.::/+/////:/+:", "f135jgkhjpu6ujbislx6i9c5cstbmezmmzhx3mv2r341hsecm1gyxip7dhahysu99hepiu2u4807l4sydtvbcl17388l8ixmy4a" ],
+        [ ":-:/soo+::://:+oo//:::osssso+/::::::/oooo/-:/oss/:/+osy++//:-:/-", "9a6kl26vy81nxichivimqpps2y29x67j0g6b5xi216iek9ncgotvxdzb8amiazgfqrscnempb57v2hyujujk6enelff52rexd26" ],
+        [ ":::+++////::+ooo//:::::+ooo+///::/://++syo/:-:/++oosyyss++:-.---", "99co83kep776wi889dnvlqo4c36nssxphri1re4iic4kie6keeb13b4vk171r2yjxvo6yu493s34opl24zzsg1gcbdfjl9edobi" ],
+        [ ":+++//+////+ooo//::::::/os//////:///+oyyssoo/:/ooosysssss+:---::", "f098yzznua1p7gxapyj3icwlcfy9dif8q5cux66jse6ey3zkdyhesi6an1pmgho0ne2hhwn9cw727v60yro1qnpwwm0xnmd4ztq" ],
+        [ "+++/+///++ooso//:/:/::+yo////////://osssosssso+oosssssss+/---:+o", "kwwugavec1skm5qj12z2udajxailpl3f7fr7niu6qh4ihxyi3ayqd3y9a2ksgspwhnowyz5sdqbcjyz3o348gtxwuft05p3bnnn" ],
+        [ "+++/+/+++osso////::-:oso++/////////oosssoooss++ssosssss+/-::+oo+", "kwwzcpwk8jdti1ih731o7nvbmsr4jklspvh1fz86jhvr7gdc4swr3rgdkp0bvhntsosfsdrcxc7wqmhmrqapdwz5vdoe2qkhrwj" ],
+        [ "+++++++oosso///:--.:ssssoo++//////:+osssssoo+osooososs+/::/oso++", "kwwyoxsu81u6u2abr8f6jy9dys9y08h5gsfycvge9x39znty2uzlvzq9loa96m0lttaxs1m61mj64vk880hxsdsxj1nk8woaf7n" ],
+        [ "o+++++ossoooo+/:..:sssssssoo++///::/+osss//osoooooooo+/::/sssos+", "kx1t93tk4d6ufyrrb7oanese3d4aq2vu61v6v6yklc1glpi41vi7354upw5gb3vylgri9udhox17uwaw7nkmblrjioohbi3a1z7" ],
+        [ "so++ossoooooo/-..:ssssssssssoo++/:-:/+o+/+ooo+oooooo+/::+ssososo", "kx1t93qno0sgad5txpsdi861tgah0p76bfaay4qmkchb4t68qh5hnuz64gr0vr14jzr0m1p4j8umdvw7fpr4xcqk3nz017ma1s9" ],
+        [ "o++ssooooooo+/../ssosssssssssso/-.-::://oo+oo+oo+oo+/:/+sooosooo", "lveets0ub7m0j3wtk30farcg4uj8301rryy1whr1hpqmvw28s6ces4glzvgks608pgxyyskdm46lawt4unlzw4rammxb9rzur2b" ],
+        [ "++ooooo+++oo+-./oooooosssssso+--.....//++///+++++o+/:+soooooosos", "lveets0udne4npimrujrfb1lmne7ydnis68hwdfiol36wc867hddslunut5vo7ju1idmhema39ijxcinvibyb2u15splcfee6pv" ],
+        [ "/://++o+++++/./oooooooosooo+:-........//////+++/o+//ooooooooooo/", "f6tdwodc77g54h4rmohpnfylveji99buv9ee1c5k7hk4ydewuhwwlueo4qzvmxd39dlzxn9svoxe05k2hpz5kspv4gezmxs94db" ],
+        [ "::::://++++/:+++++oooooo+::::........---///+//+o///ooooooooooo/:", "f0aa963qxwz73vyy3g998tzrozkjp9tznkds70uelyaz8gi2xb3vl50cztznmrdzg99alagmgnuu9px00ye52ncx53x0l6h24wu" ]
+      ],
+      '6' => [
+        [ "//dmmddddds/:/ddddddddddddddds+-/yhhhhyyyyysso/:-/dddddddddhs+-:", "11zu2jvr7if58ah07jl3bn83bak7lh0bzulh2u9u32udtixy45vi4bohp55w6s35toshc3pn9e9cuzzgq9400945kb6maiffk1rk" ],
+        [ "//dddddddhs/:/dddhhhhhhhhhhhyo+:/oyyssoooo++++/::/hhhhhhhhhyo/-:", "11zu2jb10xhoyvw05jysvd277zkmui40n8yrkw6o5wtq1zp525xmdmx4mnxpj199sx11327nt8x1ypdl86xib0eu8wir0z9j1gj4" ],
+        [ "//ddhhhhhyo/:/dddhhhhhyhhhhhys+:::///////::::::://syysssssss+/-:", "11zu2f4s737v5vu4c6ncgtix13xzo0k4c3dumcy7m45vnuzl07yhn517burtqxuca6xiw3afpveaorw7wglodsilucdqcc3jsjjk" ],
+        [ "//hhyyyyys+/:/dddhhhhhhhyyyhyo+:/shdddddddddhyso+/osssssssso+/-:", "11zu2ek4wkd3hse38obs6edc71tmouldjyfzl5et1cfd8zcs0qsgv2wd2ndgji4nofve5dyetppdtypsrgbqfr2pdzmkyoita2nk" ],
+        [ "//hhysssso+::/dddhhhhhhhhyyyyo+:/dddddddddmddhyo+:/oooooooo++:-:", "11ztybu0s2i4xy50z3hcv21teouhnkqfnm6xrhxzydet54m0fha6c3zn7x8f87p4q4sz0z139cpvm0wkscr1pfsk69kux5ft25f4" ],
+        [ "//yyssssso/::/ddhhhhhhhhyyyyyo+:/ddddddddddddhyo+---:::///++/:-:", "11ztybtd8empxypzf64tc2p19pg66jrxo8bu161ws3yih9honwwlds0iqkcq35dgnux92w7nayev6v5ur02ysmw5rc4avjyeg1dc" ],
+        [ "//ssoooo+/:-:/ydhhhhyhhyyyyyso+:/dmdddddddddhhyo+-:////::-::::-:", "11zuramrbq7lzdzc3fbzit45z6upnypz8ydt68jetwj9b8wcc3m5txnt9hu4n6udrf89yvyfksyr2t4cxkwt0vjgp3ig6dowctm8" ],
+        [ "//ooo++//:--:/shhhhyyysssssoo+/::+yyyyyyyyssss+/:/syyssoo+/:--::", "11zw4mebqmx0f658eg6r38l44i1ouw8eoq9gmhix4lpzsm567n656b3oke40fnb1eihje2uhn656scygg6vgoknki398e5f5u0vk" ],
+        [ "///::::::-:::////////////////:::::://////////:::/yyysooooo/:-:::", "11zw4qh826ut1i815dht2wxdiswe3qskt4oytwsg3ybftl3sat3e968b373htrqo3v3h63e2avxo8tgsozobywhfas6rjnggn3e8" ],
+        [ "mmmmddddhyysssssssso/:/sssssssssoooo+++/::oo+:::osso+++///:-:oyd", "yha8xoz6kmjpu64njvxhmx1t6xdp4cvlqbj6q0sbi1ictqapeszcpbcvco04ujjw1456wabjkv919ahtobw7i413pngnpuf5hpb"  ],
+        [ "mmmmdddddddddddddddyo::/++//////////////:::/:::::::--------:+ymd", "yhlrk3911z2k5x8309gjtfwwpm07uzdqrprx00ovzo5u79oq6hshtqigkkvyqz81ochlluguoae1rqwyvyizgp1pqj8fibbxrdr"  ],
+        [ "dmmddddddddddddddddyo:://++//::://+++++++/////////////:::::/sdmd", "yhlshct0m7wktlxuwgeo2nbcjtz5geeaommyb61akper9gzo788fqxutqvksaebi3ync9yp2zslxeph87mb5vm0fxq0p4bapc61"  ],
+        [ "ddddddddddddddddhhhyo:/ooooo+/-:/++++++++++++++++///////:-:ohddd", "yhg5mdlwxrr9zb31cqho9d3gj0n3ogps3mzh1qnwfcsp4qzxbtytmy7cc9pbezkrdq7lu6gisdkxxjz58lqyw090ijfct2jp0bc"  ],
+        [ "dddhhhhhhhhhhhhhhhhyo:/oo++++/-:-::::::::::::::::::------::ydddd", "yhg5ib235b8kz7kpwb81o1cxx0qo5fz2iqeiokzjiim1500qyptmg9pb2grpbca93qxpchuwvbz5z61ag7q45sjyeaumqvc628o"  ],
+        [ "sssssssssoooooooosso+:/oo++++/-:dmddddhhhy+-/++++++++//:-::sysss", "rmb3qtvazvgp381444vnxmrpbo5h465e7dyedyi072cdeaiccs6tgeiser3twirrzy7ure06li3sps86f1aknu1rlb5dp8u6ugd"  ],
+        [ "::::::::::::::::::::::/oo++++/-/mdhhhyyyyyo-::::::::::::-:::----", "11u581l5hdjn45pkzah5kbdzqnfkkztwtx3upsxbv3urhm8yxueofzrinavif5953wqrc1e5sh7sizkxz41unw8nzhuxdqycyqr3" ],
+        [ "/+yddddmmmmmmmmmmmddo:/oo++++/-/mdhhhhhhyyo-:ossssssooooooo+/:::", "11zw4qigb52phml2txub8b1xdd0ajkid03lm0usgkgyyk734snps10o2adkhzmh4h2ff9o6uywkthddmauuhjzc5xnl5dkdgzsog" ],
+        [ "/hdmmmmmmmmmmmmmmmdds:/oo++++/-/mddhhhhhyyo-/ddddhhhhyyyyyys+:-:", "11zurbsde5ege163h87xd3kucu582nkkc9g3vlgsoke0njuusgzyxa7fjv1fwmabkhczmxyiabsuvg4gopswu3di8lu4j30pmqk0" ],
+        [ "/ddmmmmmmddddddddddhs:/oo+++++-/mddhhhhhyyo-/hhhysssssssssss+/-:", "11zu2f4s737v5vu4c6nbpzn41tvbhheooxuxsr8o7rbbzllniqgst2vpdyjzymhct99peuhzj8ighhk1xv5a6oaxh2ax3sg58d0w" ],
+        [ "/dmmdddddddddddddddyo:/oooooo+-/mdhhhhhhyyo-/hhysssssssysssso/-:", "11zu2j7l7o23fpq25uh1dojg8qio39a2lqyjk7tixa0l3u0uw62pzzwta8vl3hut2ayiuep2dyw3a63zwvws2h0suy0ar0p1oik0" ],
+        [ "/dmmdddddddddddddddyo:/ssooss+-/mdhhhhhhhyo-/yhyyyyyyyyyyyyyo+-:", "11zu2jb10gabxuhu56sbt9fnmj842nxvtxd1528mp9mjv8cuhg1z48cf8599l8b1t9asl3ojosonsnpu49apkfe2m1yzfd4ozzzk" ],
+        [ "/hddhhhhhhhhhhhddhhyo:/oooooo+-/mdhhhhhhhho-/yhyyyyyyyyyyyyys+-:", "11zu6m154vp5lfnq2khgkriobd81q2saal2plcl4kfrg4tzmw3b0tk960h2csi3cgjwz7xzdynn2qgqglw6k9vf8q5ae9fyf91ww" ],
+        [ "//ssssssssssssssysso+:///::::::/mdhhddddhyo::+oooooooooooooo+/-:", "11zu2f4rp7a185e5o726lh7togx6tzd4b51vhjzlckj88moq4bptwairy529ssj3zahlb4js4mmmc5qkbsd3yuahqjmunt56gmi8" ],
+        [ "//://///:::://////:::://hmddho//mdddddddhs+:::::::::::::::::::::", "125m8by8y0esswkhff90nimmniv95n4de97pjgmvfdg31mu74dyd19o3ibrkp2gxa03988xl6e2bkvcl1zla2y692ubh79jo8xrk" ],
+        [ "ddddddddyo/odmdddddhs+:/dddhy+:/mmdddhhys+::/ohddddddddddddddddd", "yhg5ib2n73042m6crrdm6q2u3ytv69mqe8f7nbv2ul23bj2zduv3rpfh3g4hnu6ltjgj4ep3x9lufrqvo6xkmosxl57vj1l1hp4"  ],
+        [ "syyhhhhyyo:sddhhhhhyo/:/hdyys+:/mmhhyso+/:/+syhhhhhyyyyyyyyyyyyy", "rmb3qtva8u8l9fff8dmoyiv14x74997k2hy0jjrqe82xb5o9x81bylaxgccm3wrbx08tja7z3cmuguncwkhsbsnrrzhjsfpgn1p"  ],
+        [ "+oooooooo+:hdhyssso+/:::/osso/-:ssso++:::+oosssssooooooooooooooo", "kwwyo9prqgnkgx46qu0j497g2uukumyhmlo48xpts3y24yx12kcv99gedcy9igaq35j79b2xoh4vuvo2jf0ad3atix9yhn151fn"  ],
+        [ "::::::::::/sso+++//::/++/-://:::::::::::::::::::::::::::::::::::", "11zw4mewf2516mdwrqj40gdzoxx26x470szjjpa7ospw2tym24hkf1vsr1n1mygafpqnn2zcqbvnfe2o4w7t4ph0uezf9ak4owku" ],
+        [ "::osssssssssssoooo+:/ddhyo/::ohdmmddhhhyyyssssssssssssssssooo+/:", "11zxagtrdjiaa0exs23xc147moh1oaiu8kld8ghdc2ta0vbw03j6hp0bed0jt61okds6wjuydz4ozkrlg83rzmv03gc0maekk1da" ],
+        [ ":/dddddddhhhhhhhyo+:/ddyss+-:ddddddhhhhhhhhhhhhhhhhhhhhhhhhhys/-", "11l8lm82qxzky1pzx2eap6dd4oapchrndfcwh0rgofae7tvm9swkc09a6ecx6wrqzxkctt14djdnqeph2ibcnkco648scmg3lo8e" ],
+        [ ":/yhhyyyyssssssoo/::/dhsoo/-:yhyyyyssssssssssssssssssssssssoo+/-", "11l7js9jl5y4d6caegpe60garkhx30k5b6v4b86qgl9s9psl3p9z2558ncox8xbqzcybfgb4shvlpgbzvmn5s67y91hjgqyekovi" ],
+        [ ":/++++///////////:-:/oo///:-:+ooo+++/////////////////////////:--", "11oek4az2qtbroezuekj31b8yivze8oazjx244mw3et4tijc7bds4wmkmotgedcgmvljk141p33hv2mqrcccde0khs0xf3ecrdgu" ],
+      ],
+      '9' => [
+        [ "s/////++++++++++++++++++++++++++++++///////////////////////////:", "11uomcx8y6iccwomfzj27qll45xk601vwdehevuj9lf6ogac4hmr7tvp24uk1gjfhtprvwtow9ezevv34kjo66m1et8vv2171k39" ],
+        [ "d++smh//oooooossssssssssssssssssosososooooooooooooooooooosmh//+-", "3oi6h3boqah8c38wylfoanugksb3vpbs7qd6qfhx5nrv9evwsysiujlfl30io1azrterlpwbnqihh2gy741noajg1l8lq5ydlso"  ],
+        [ "d//os///++++o+oooooosossssssssssssssssssssssssosososoooooss///o-", "3oi6h34qaun22r4g16m6vhj3fcxh8liyt3rztletfzla4obl4un5ikg96x5a6wlepicqzafr3ebyybn45tq93nq3sfkpjm2k4ns"  ],
+        [ "d/////++++++/+++/+oo/ooo/oso/sss/sss+sss+sss+sss+sss+sssssososo-", "3oibcgfjj3us7h7o7bigoddpbtalpq54jk5gc7lqbzg4t0r2lrvicdwmrfl6clxlexabmp5uowifwuvye4zk15c9l9hbgq7r4ig"  ],
+        [ "d////////++:::::::::::::::::::::::::::::::::::::::::oNsssssssss-", "3pbaqqdu8kymik1x9r0qblupgzyrwymp4nu3k68kics3uq3w4le1587oasdpqfgwmue60b5hfhssx7qdcb7f2599oljtp8j7cm0"  ],
+        [ "h//+ys/////:-+++++++++++++o+oooooooooosossssssssssssdNsssymh//s-", "3pb5usn6bprpviuztaivbai9wen3qppjnk74j6k0bdezloyeu3jx4b39yr7qab0dawm41vhoabe5nsdaqh1lvbeqv4mp5ly2a9g"  ],
+        [ "y::/o//:///:-///++++++++++++++++oooooooooooooosossssdNsssss///s-", "3pb5usg7w9j32k2vtvmqm5m50bxu88a9eq5879edm9clu7wqm6v0nba6xh4u5rgw2ehxotsi2chfk1pgsgf7dvd5rnsgjmdsw38"  ],
+        [ "y::::::////:-///////++++++++++++++++o+oooooooooooooodNsssssssss-", "3pbaqqdu8kymik1xa2o2so7b0wps18s3082i1yn4e4nnuagzt6s7o7s8z25fmfec2ro5wnm55shodb7m0g85r4176to6wup3mno"  ],
+        [ "y::::::////:-///////////++++++++++++++++o+oooooooooodNoooososss-", "3pbaqqaxs42ir2ubrj1tlf4cfolkxrcmuzhldqm9sdt8nbe1awb5avsaky5kn0ryrd94w7xh1zhokn4gzy6w8rvi4kcoq65hfn8"  ],
+        [ "s::/++/:://:-///////////////++++++++++++++++++oooooodNooosmh//o-", "3oi6h3boqah8c391kh8p2b9pc3cva7bp5ny8tlf6ebcwgfoq5sj0fwztgcr84tyefzpgkcwgto90v36bexs43ns99lkynpxwr49"  ],
+        [ "s::///:-::::-//////////////////+++++++++++++++++++o+dNoooss///o-", "3oi6h34qaun22r4kn2egt6xwnkaddkqfhd1t6kj6xdggms1zqh2w9zw91i3i8sn8zj1wldeq4dc23wu3h0vracsqg8k65brbhvt"  ],
+        [ "s::::::::::--://///////////////////+++++++++++++++++dNo+ooooooo-", "3oi79q8in850uu48varrfu59s1skvg9c3gvcztj22si3qsl3dawxntwcb8zps4nwri1hhezwcn0wl1nklwslj08kozdwcrwi1xl"  ],
+        [ "s::::::::::--::://////////////////////++++++++++++++dN++++++ooo-", "3oi79q8in850uu48varrfu59s1skvg9ar81yhl36b49gkbprzxgi4k7736lekmmvyiylk59tr6w0cblmwgxnocu2q8fki4rhg7d"  ],
+        [ "s::/+//::::--:::::////////////////////////++++++++++yN+++smh//+-", "3oi6h3boqah8c391kbxw881cxghtccz4nzwgefrm6fydzrbanek1txudkuffneeul0jmo8al0zw276euz2nt9xtjiz9nun7k4ll"  ],
+        [ "s::///:-:::--::::::://///////////////////////+++++++ym+++ss///+-", "3oi6h34qaun22r4jdwgtehzlxcrqb2w8ubieq0l80ymuhqcwcbbpekfb93q68pfux25fvmb0lohk3sioyievrzc7wcpt5s4tidl"  ],
+        [ "s::::::::::--:::::::::///////////////////////////+++ym+++++++++-", "3oi79q8in850ujtmlxi3h9d6b3q0k7fbcn3i0hs0nqf3ujnse3p6jls4ynektwmj5vn3zg6imocewrxyqdxc5zfnlwo6rvwrvwp"  ],
+        [ "o::::::::::--:::::::::::////////////////////////////ym+++++++++-", "3oi79q7yc19apboqxpjkfmz903ydamc2keq5q8ak7yi10fp6823ijlhqf52kjize6p3wgph1n9lf2d7u9zeykufi48afy3xydk5"  ],
+        [ "o::///:::::--::::::::::::://////////////////////////yd///smh//+-", "3oi6h3boqah6alnlqpcx4w51i8eook3a643ks8ha6ockotmltkhal09ybjqgzqdqtguts9bgtcrc4omf8ps9nrmaqc05s6xg1t1"  ],
+        [ "o::///:-:::--:::::::::::::::////////////////////////sd///os///+-", "3ocjlf7hvoqtvshv7egg9qwasfkjizuow0oxz08j0rvatalzb67lr1zcucgf49nyo4n99i94bdgemexxjjmh218dpc3yyh5zmlh"  ],
+        [ "o::::::::::--:::::::::::::::::://///////////////////sd/////////-", "3ocjlf7he2n9n82nv32xcyz1lzkukdl1rr9h45upgj94074ag1olvd8su9f9m7jx9xgp5f1pj81uveoomkgt9v9qhu2oncystgl"  ],
+        [ "o::::::::::--::::::::::::::::::::///////////////////sy/////////-", "3ocjlf7he2n9n82mte9vdzmu27ochiihl3o8szua7ny51mx3acc2et4cy93b58aveni1sqlt5syk6d3yxo8d4dhcd8wiznx5elh"  ],
+        [ "o/:/+//::::--:::::::::::::::::::::://///////////////sy///ohy///-", "3ocjlfbj1a30uf1v8t52h32z9lyqruuy46wi2r59l67sjb1oto50rco19vpqth2xhdjo13cel2lnyir0vm2a9qodhdcx7vmc4yt"  ],
+        [ "o/////:-:::--::::::::::::::::::::::::///////////////oy///+so///-", "3ocjlfayn8dn42uhg57g2hg3ojb71exqy5co3wlgjmtpvr1cb8qrna4ejokqk3wo6ipkebvpvcb00pmbqhz42i2dg13iyjxvp5x"  ],
+        [ "o//::::::::--:::::::::::::::::::::::::://///////////oy/////////-", "3ocjlf7he2n9n82lrk60kx2a3vjzec09bu68w06xqrkgd24vvv9edzoy2v2xautdyjtfr8jskbw7rucgi41yp57aebwb784mvqd"  ],
+        [ "o///:::::::--::::::::::::::::::::::::::::///////////os/////////-", "3ocjlf7he2n9n82lk8cd746wn13dzj4e5wkpfxx75ymgyj4xf1x98wqun7ikmcp969opubli87lcjt3ofrixgpfsmmna4mii71h"  ],
+        [ "o///+//::::--:::::::::::::::::::::::::::::://///////+s///+ys///-", "3ocjlfayq37ap6yefi3glpv7uco0klrj32cr1s5ce8pt87kfl34nmilli0m7w28s1di6exc2po1t05tgcv5ycinc2sas504r3fp"  ],
+        [ "o/////:-:::--::::::::::::::::::::::::::::::::///////+o///+o//:/-", "3ocgv81jdr1lirsy6j70u0nq81oi08x4kfnhopshl1ek05z1c2lcm2tsovftl9tg19edhq3a3r4ks3olczuyr2gh7aswdn5d8o5"  ],
+        [ "o//::::::::-://///////////////////////////////+++++++o/////////-", "3ocjl1ecm7tmbxs0nnpdiujzfok2w9nldh7cm9kft4f5hh5s4lh9b2u6nqq9txqza2urs2vy4q83eknj51do2fbzmyk3090x5id"  ],
+        [ "o/////::::::-:::-:::-:::-:::-:::-:::-:::-:::-:::-///://////////-", "3ocjlf7he2n9n7xlmvwa5y9z09wuwl55woeyf7sffajwdrsdzcommwxbzc7kmp6mnwypwfo7v6p6l5xqcaisgdb9mrb33e60m5h"  ],
+        [ "o///o+:::::::::::::::::::::::::::::::::::::::::::::///////s+/:/-", "3ocgvltb8j9rp2659tik4je8389y0e92xshie78ufntzjm7ciss6du9gc4mv0p74qui7j913nbcxwip1of4a1o4virjpqm289wl"  ],
+        [ "o////::-::::::::::::::::::::::::::::::::::::::::::::://///+/::/-", "3ocgv81jdqmxz6jbp7zc4hl9zh79jdoh83s5cp7t1ms7yqvv47y5kc7iszywdqiropcdhoh9p403ywmzrg1b7bcii6jnuuxerz9"  ],
+        [ "+///:::////////////////////////////////////////////////////////:", "121r7thns7lwbhoes37r58ej4m8e0qwqdwrv3g6cxer0cdyycuk1lpvtwp82nv8a1d6x6njt36qnl4s7fnci2aenoum9bpxslcg2" ]
+      ],
+      'D' => [
+        [ ".--------------------------------------------------------------.", "11pc9ei9rjbknpv5lnpg4wmzymdsysr8tu0i8a8betgn5p4bqp9ukaomrq223mmo2d1qfhhip0ms9i8xev5iaqgrfswlxzgn6xv1" ],
+        [ ".ooo+:-++++++:-+o++++:-++++++:-+++oo+:-+ooo++:-++++++:-+++//+/:.", "11oylhof5275barq5b4lqrflc59nl8ymyi4u75mss0vnwtjjwxpab4yefhzqrflvlpys65n52gwzbhi5dgh8za5slrr8recwdn1p" ],
+        [ ".oooo/-://///--://///--://///--:/++o/--:++///--://///--:::/++/:.", "11oylhof525rhjgbb695j2jse96aof36uaer55o9i9usmm9cdl9oafz00b4p1o39jxd7emem80bgpd6vl6edy4vp0qlvfggumval" ],
+        [ ".o+hoh+/////////////////////////////////////////////////:.+/y/:.", "11oylid2dchrjo6b5of13hds08gey6ochnn8oi6c27ekisdtiv0hwhprh7qrits8dtvoxn53e4ln9jcipzvcqd4rg1isgccn5yp9" ],
+        [ ".::/oNyooooooooooooooooooooosssssssssssssssoooooooo++++/:.:://:.", "11oylhod75gbkydeai0ndtj63xfc0nevloy2pqq9ha4ixhe8e6xx3hz8tf4qpobfcbk8qq15pvl9agfvtki50yfww4mn4mc6zdv1" ],
+        [ ".ooooNhoooooooooooooooooossssssssssssssssoooooooo++++++/:.+oo/:.", "11oylhsg4yb891r695fyrcfwbzzt28ko0itn71ynidyuh28abtpob5e9f52rqrc9jf9s4it9x5of4i8jlsqvkv345q44ifrfl1il" ],
+        [ ".ooooNhoooooooooooooossssssssssssssssssoooooooo++++++///:.+oo/:.", "11oylhsg5161wmva7dthbzwlvimjx1ko6ozkxkjy9lndpvrw965atf89jd3rsvi1el5zvr2pat7hnwqyh3radui3xoob9j8xyvot" ],
+        [ ".o+hoNhoooooooooossssssssssssssssssssoooooooo+++++++////:.++h/:.", "11oylih2t0a74fu9b3x9zz5j9yc0dg5s2h0993hyk0ekmwtzw7ost45ydrdg8p28s9h7eec1ockfn42jl2p8sisni0lwib1kyr59" ],
+        [ ".::/oNhooooooosssssssssssssssssssssoooooooooo+++++//////:.:://:.", "11oylhod75gbkydeai0n8kz568nttfezwv3gtgvxpaxm56q8sw089cpbmpi3oezfk5k1gx6ohv7o1ck9y8ivekvdlp2i9uswdtkd" ],
+        [ ".ooooNhooosssssssssssssssssssssssoooooooooo+++++++//////:.ooo/:.", "11oylhsg5161wmva7dthbzwi5a4vdgnbums4ltbifi5pa7iywm1ifn64826qqgnb3i79rq7gdc473ymgi94h0gj1sdgh63so0lpp" ],
+        [ ".ooooNhssssssssssssssssssssssssoooooooooo+++++++////////:.ooo/:.", "11oylhsg5161wmva7dthbzwi5a4vderaodol5fgo1ykzjs2vbpfhxf3i2f320yzyx6nsxouu4em159dojb7drr43odlp6kfsbhm5" ],
+        [ ".o+hoNhssssssssssssssssssssssoooooooooooo++++++///////+/:.o+h/:.", "11oylih2t0a74fu9b3x9zz5j9y9ct4p43uc4c35rwzapo8sz9yrma5ccq1hdmv8d2mmogz28zx1xh5ghf330q3qmwmiksogcgnal" ],
+        [ ".::/oNhssssssssssssssssssssoooooooooooo+++++++////////+/:.:://:.", "11oylhod75gbkydeai0n8kz568nttdiyp9kargndfqva1c8qiqs5s3pf7ow1dr4qy6gu2w6yb1ux1hs6l0b3yykqx43pjj0art9p" ],
+        [ ".ooooNhsssssssshhdhdhdhhhoooooooooooo+++++++/////////++/:.ooo/:.", "11oylhsg5161wmva7dthbzwi5a4vderan18yjt2y5y3d6d1gmgucdsbex2ojb7vir8wtk4chsmlu80d8l9ogc2qpaqcmpwi2v20d" ],
+        [ ".oossNhssyyhss+:/:s+o+dhmoooooooooo++++++++/////////+++/:.o+//:.", "11oylhofpg8fzhavk5gb5tixj6n6pqh5195txb3eoda8u9dvj1q5yh7hez03e5319x51gt486hhra47z8qc70bwz73m4b7lgd9m5" ],
+        [ ".o+hsNho:.+dy+:`////++oodooooooooo++++++++//////////+++/:.+/o/:.", "11oylhsdn06gw4bw73o65t4lhy41dfrjtozqq2dle2nqufl4d0mdj76j0rt3ss3k7uitnhhh3y2l8zzmxbk0b1yu2hw6bf1m2sbx" ],
+        [ ".::/sNo/y.+dy/:`::/ssy++hoooooooo+++++++///////////++++/:.:://:.", "11oylham00jdkfaad4rhi9ebn1u1uhpacazac1b68fs85p2pn0uedsl5n4pmvlk4o4shom9cu73gj61uhxh7e2wp6yv1yf96cpnx" ],
+        [ ".ssydy+/h.+hy/:`.`/  h//hoooooo++++++++///////////+++++/:.:/+/:.", "11oylhof4se77qkkwznbl78nae684mdbb94wuc1s73kbb5yvnprg29td1t3y1qqqy8pw0kzdtusbwzo6lipy8mcepfun0huw9gx9" ],
+        [ ".hdmmo+/y.+hy/:```-.-s//hoooo+++++++++////////////+++++/:.//o/:.", "11oylhsfkn4ciwj2tlauife3m3mfoolwfokcsxsop4upv895957o5ydp7lz3s5id42qubrlja8s94sk8keu6nqcj0sflisjclr71" ],
+        [ ".dhNNo+/y.+sy/:``````.//yoo+++++++++/////////////++++++/:.//h/:.", "11oylih2sxfdguq5cvjra34wizcsaomkkwj02kqtmf11qzda0pq4qz4bmcu25tvenlshjtjn5wb11wpj3j5g92zjvpalwvo8h0j1" ],
+        [ ".o+yNo+//:-+s/:`.`:-:-+/yoo+++++++//////////////+++++++/:.:://:.", "11oylhod75gbkydfqm3hiqa8y10rpc1m60ujl4hho4eko2whc029x2o1bjurrljco78r19drtetq4rfx27xyvt4p4bhlorm4b10t" ],
+        [ ".mmmms+//+sso/:```...---++++++++++//////////////+++++++/:./+o/:.", "11oylhsfkn4ciwj49pdoskp7dvzdkn4jwfulmlnhh7vy9aanu3qhz7n330x39g60xcsvthum64bih4mcdvvbhw8mz7t91s9h073h" ],
+        [ ".mmdhs+osssoo///////////++++++++//////////////+++++++++/:.+oo/:.", "11oylhsg4yb891r7pgumjmzujkfo2frg2s0p71zjym85u40gp84iupsmbdmmeptng8laqy2xcahi6t2j9vk16vs6d4zjil7i6zu5" ],
+        [ ".ysdydossoooooooooooooo+++++++////////////////+++++++++/:.++h/:.", "11oylih2t0a74fuarfbxxi9if7gq0lrt2iwxbvvgvjv4u0jv0iwa4ob6g98m64p80iza0c6l2iccihrfls2el124d3aizkkor84t" ],
+        [ ".::/yNyoooooooooooooo++++++++////////////////+++++++++o/:.:://:.", "11oylhod75gbkydfqtgc9pxqxwp4jvnpcwq4il49xiknjekx1dfw81449igllzrztdjb8f9le3692yzacej5l9hix444g3085ckt" ],
+        [ ".ssysNhoooooooooooo+++++++++////////////////++++++++++o/:.ooo/:.", "11oylhsg5161wmvbnp96d4v3wy663ww1aoesaxjunpsqofdn53i2tpq3yw93v434qdgzikxgg83lypv7gg1dtwyuvn8v6df9vp4d" ],
+        [ ".ssssNhoooooooooo+++++++++//////////////////+++++++++oo/:.ooo/:.", "11oylhsg5161wmvbnp96d4v3wy663ww1aoesaxjunpsqofdn53i2tpq3yw93v434qdfu0893nnqythue31i0jqnyzh3jyjhclast" ],
+        [ ".o+hsNhoooooooooo+++++++//////////////////+++++++++++oo/:.++h/:.", "11oylih2t0a74fuarfcz6bxnexbm4ntfv3kj7ikvbwfotakxvzeh3vh5c9c3aq9oqz8hghzxuhtro6yenhtpnsuff2rqwmuzg7ot" ],
+        [ ".::/oNhyysysysssssssssssooo+++++++++oooooooooooooooooooo:.:://:.", "11oylhod75gbkynqbtnokpglh9hm0m6hfcynei4zzjtje1lgs6q7xabttgz1pu6lz5atou7qwdiivxjokv0ojj6eeh2v743ebnql" ],
+        [ ".oooohhhhhhhhhhhhhyyyyyyyyyssooooosyyyyyyyyyyhhhhhhyyyys++ooo/:.", "11oylhsg516gm8fv0ez4hwtvkiywjyqlqmu4mjp2cmb70x7w505akcd2oekc9dtyu1mv9ugx6zpog3z40n7hmt06nxasohrjt9t9" ],
+        [ ".oooo/:yooooo/:y+++++/-++///::-::///+/-++++oo/:yooooo/:yooooo/:.", "11oylhsg516v2s24rf215sphn52xjj0albelx4il2meaniimitgoxof5nwbq6mfj7uw8jqgw923jjuxgnp4ppyjgtamjcn5hglil" ],
+        [ "-////::://///::://///:::::::::::::://::://///::://///::://///::-", "120seosrx8421e6769sky3ueotnmlbd3rl6mqc7cfvk23unl7atm4uyvq466qco4m2d560ch6aaihz4utlv72287ek4yht132cj3" ]
+      ],
+      'E' => [
+        [ "mmmmmddddhhhhhyyyyyysssssssooooooooooooosssssssyyyyyyhhhhhdddddm", "11zw4uli2qjnxvw6h849ekmn19qjxmvl517541kpq7dzu21kqm3spvs3d6youq1ca18a93d62s1oe1inkjel5knzlumv8t4sckbx" ],
+        [ "mmmddddhhhhyyyyysssssoooooooooo+++++oooooooooosssssyyyyyhhhhdddd", "125n1fftt1aav7105t884e332hxj5ailv33ubobhgnqzizzd8iy8trsxjct01y7bz7kv6oqnkjoq93h5qldu743oye39any4ngfi" ],
+        [ "mddddhhhhyyyyssssoooooo+++++++++++++++++++++oooooossssyyyyhhhhdd", "125nuivunhhr9iuzk51vz7xdgzxytpt7xm8bf4wr9uhg26i60zik27y285cxll7g7a4w0sljgua7sxxotjsdqbj53xuypcob5432" ],
+        [ "dddhhhhyyyyssssoooo++++++/////////////////++++++oooossssyyyyhhhh", "12bddmnkx8d30voibtl2edkn5szw7in9yaqw1ng5x0iq8girnai2kyy4lxxfm0jljphw1s9ott2hjqjyvvy3t53kkzzmj6ulfzsf" ],
+        [ "ddhhhyyyyssssooo+++++///////:::::::::::///////+++++oooosssyyyyhh", "127c8cjb322m7njg4qco9jtm0reian5axg2z57lct6t16lezbfxxhumhz8yj5cw48vnkmpgg7qiou6kntfiym51bqhx2ataimc4v" ],
+        [ "dhhhyyyssssooo++++/////::::::::::::::::::::://///++++ooossssyyyh", "9j6oi82mgh5zy3j7vdzdbcgwz54n0fz6vr7cq8itvkor0yyh5adoqk2z9ion713o1u6kn2m1g4dtnpzwbzzphyir0r62x7foiy8"  ],
+        [ "hhhyyysssooo++++////:::::----------------::::::////++++ooosssyyy", "12h5nwqd0fthtcse93s3zj9k3jn9mjfy5v7z57qgoguwp3zk5a3n9gsbxnkxykqnyd2apta1dlxr1meeexk1b2a1h8pozbyeh5gw" ],
+        [ "hhyyysssooo+++////::::------..........-------::::////+++ooosssyy", "12mvri6z9owrtimlw3suv2657qi1mjuhb693fjbkczmf4qg507xs55vb9xjsc1m4ec96qriyo426mgxxtt7dacw40x2ay8xqd9vf" ],
+        [ "hyyysssoo++++///::::-----.................-----::::///+++ooosssy", "12mvrm96fycvqgskrrm0jbtw1ibk9378gqr6ycwkqpxjjs5mlxgxxae53sy2s32fo4gi93b5vzw64yqxf5s2epjt8tqze0clvo6z" ],
+        [ "yyysssooo++////:::----.......`````````.......----:::///+++ooosss", "12mwkhw6z4wovvtzxqp8h1ekxk8spc2pyyeuwn0wi27b23arybvp40ookmqh46tyauwv35iib0pw0ihgje9xax70alcokxtsf10x" ],
+        [ "yysssooo+++///:::----....`````````````````....----:::///+++oooss", "12slxhjzc3ffvulvzxxh7qd70kivp1suq8b1l6ipilwg7abgukct8feuamiwimfh15lkehcay9f4rr0ga6e7bjbqeyd66vwcyd4h" ],
+        [ "yysssoo+++///:::---.....```````````````````.....---:::///+++ooss", "12slxhjzdps1h7135fm8d7a6ppuuw5cjvq9fxv8jgt00usiamwtow8qgnur5n96bkyrh7cl5e5pn179ioe75si7hijal4zaiuy9e" ],
+        [ "ysssooo++///:::----...```````         ```````...----:::///++ooos", "12ncqklwfqfsik8xhgdn9nn727t5hywbgcsrfjrmaampk061s824xpqcgu1x9bd8ippmflkwj6gnooro82bs0gwa2ih3bjb7zwmq" ],
+        [ "ysssoo+++///:::---....`````             `````....---:::///+++oos", "12ncqklwfqfsik8xhhfc30il4irgnxtxsjxrppwoaoh6ryuu51pwcl5l662n1bnh6k36w1dp2qlrp64toxhwkmue6t6f43es5vjm" ],
+        [ "ysssoo+++///:::---...`````              ``````...---:::///+++oos", "12ncqklwfqfsik8xhhfc30ilnmf6yj0nem8ko4vj9uthbbtpocvforz4ugdroas3ntljk9azfag721jiljiq7ats8lwz1j4ruuwi" ],
+        [ "ysssoo+++///:::---...`````              ``````...---:::///+++oos", "12ncqklwfqfsik8xhhfc30ilnmf6yj0nem8ko4vj9uthbbtpocvforz4ugdroas3ntljk9azfdfyy2qktdjcnr0mpe2zxgivx90y" ],
+        [ "ysssoo+++///:::---....`````             `````....---:::///+++oos", "12ncqklwfqfsik8xhhfc30il4irgnxtxsjxrppwoaoh6ryuu51pwcl5l662n1bnh6k36w1dp2qlrp64toxhwkmue6t6f43es5vjm" ],
+        [ "ysssooo++///:::----...``````           ``````...----:::///++ooos", "12ncqklwfqfsik8xhhfc2pm6efcxegz6iwzf0rwh8kzclmfmermuidyyutisvzvge91x3q0c4m26p8tcvv83tvfotzk1p1bnifoy" ],
+        [ "yysssoo+++///:::---....`````````   `````````....---:::///+++ooss", "12slxhjzdps1h7135fm8d7a6ppuuw5cjvq9fxv8jgsze4hkkqqyhzhzdru7ypfvcnc5jh7cl3zt8d7agr815qzqimslq2nndieia" ],
+        [ "yysssooo+++///:::---.....`````````````````.....---:::///+++oooss", "12slxhjzdprzetxuf9lo6wftgnv3b0yjhk2e1bhq882ee31frccf843qj6d4yyvz2y2ryplih61wlvoz3djlo81o2xw549u31ss1" ],
+        [ "yyysssooo+++///:::----......```````````......----:::////+++oosss", "12mwkhw6z4wovvtzxrqxa3dk9rskluf9k985e9band99vahue2z6rij77kt8e8t8zalp4letcmd70zxsonbynb88a3jsy7qabbw1" ],
+        [ "hyyysssooo+++///:::-----...................-----:::///++++oosssy", "12mwklmvrfyam7aft50qewfdh4m4l21vayvoig7drs12zmw13g1kzumzy12mons12i7kmema2n1d0hmwrwfnjbwvf5hpdfqtkvld" ],
+        [ "hhyyysssooo+++////::::------...........------::::////+++ooosssyy", "12mvrm9pdtc6nc229qyps1ekv9pqiqd0ctv3o888ph5ofq3v0dnz117218v4qtutm78tnijj0a1yzppk1p7saw5y0tg4nxo7ps1n" ],
+        [ "hhhyyysssooo+++/////:::::-----------------::::://///+++ooosssyyy", "12h5nwqd0fthtgmmnr37ug966iapfvz04gyrxukuhcv4a7p80geo20csf9a4eb9xcysrokf0y8hs58phm827ewecy5vwzmwp2ne8" ],
+        [ "dhhhyyysssoooo+++/////:::::::::-----::::::::://///+++oooosssyyyh", "12h4uxcnm257fvprhwskplp1xv5gnj2xxwgs8q812aytrquspygxi01wflwt20mocltzyq1hzdt0bknrqrfe93l1jh2sqdpqimls" ],
+        [ "ddhhhyyyysssoooo++++///////:::::::::::::///////++++oooosssyyyyhh", "9f45iurskogihztj8ypyjxnd90bd4wroedrze8dx6qcq7zs6zke7fj4ahp64bncfl33xw5pvw7qw69m0pqfte8szq2ceh2vucbz"  ],
+        [ "dddhhhhyyyssssooooo+++++///////////////////+++++ooooossssyyyhhhh", "12bddmnkx8d30vpz9ogyzrpm8wfo9rd7qfl93osuxt8wf9mou297ubgzi7r86eks8wscq7bashq9if951fzi8aj5fivbiu8ulvcf" ],
+        [ "mddddhhhyyyyyssssooooo+++++++++++++++++++++++ooooossssyyyyyhhhdd", "125nug0415xaqtdi7mh3dqvw2aramahz1947gzief5o40ohnlk5w78hz5lcvqtrk7hkkq863lcolca6yog14igh5w0avaxu29otq" ],
+        [ "mmddddhhhhhyyyysssssooooooooo+++++++++ooooooooosssssyyyyhhhhhddd", "125n1fftqzfkn12qknimye7beutnka2di4azen4g1m8debm0lju2xjoeo29la6c7395yjw5i67mcds6e4z4urlmps873fo5raj8u" ],
+        [ "mmmmdddddhhhhyyyyyysssssssooooooooooooooosssssssyyyyyyhhhhdddddm", "11zw4uli2qjnxvw6h849ekmn19qjzjpyee5zffftwa062j5rwkqrjpbborx54yplbz450wbxfut3ldawu7hdl0nfwlfpn43xy2nh" ],
+        [ "Nmmmmmdddddhhhhhyyyyyyyysssssssssssssssssssyyyyyyyyhhhhhdddddmmm", "11zw4qi7bt04tytrxjahtptwd35w636u8gqo1zb391jrso09d1q842juowa8zyu15m67v7ttn94zc74169w83nkot5n0cakloa25" ],
+        [ "NNNmmmmmddddddhhhhhhhyyyyyyyyyyyyyyyyyyyyyyyyyhhhhhhhddddddmmmmm", "11u581lq45udtc17f3yno4wg62watdep8i6wus0fl7uv5t0grmv3q9b8pgo7r5dw12fqxgecx1wgkwv4g0dbw6qo6gg0wph4p818" ]
+      ]
+    }
+  end
+
+  def self.wall_colors
+    {
+      '0' => [ Color::BLUE,    Color::LIGHT_BLUE ],
+      '0' => [ Color::CYAN,    Color::LIGHT_CYAN ],
+      '0' => [ Color::GREEN,   Color::LIGHT_GREEN ],
+      '0' => [ Color::RED,     Color::LIGHT_RED ],
+      '0' => [ Color::YELLOW,  Color::LIGHT_YELLOW ],
+      '1' => [ Color::GRAY,    Color::WHITE ],
+      '2' => [ Color::GRAY,    Color::WHITE ],
+      '3' => [ Color::GRAY,    Color::WHITE ],
+      '4' => [ Color::BLUE,    Color::LIGHT_BLUE ],
+      '5' => [ Color::YELLOW,  Color::LIGHT_YELLOW ],
+      '6' => [ Color::YELLOW,  Color::LIGHT_YELLOW ],
+      '9' => [ Color::GREEN,   Color::LIGHT_GREEN ],
+      'D' => [ Color::CYAN,    Color::LIGHT_CYAN ],
+      'E' => [ Color::MAGENTA, Color::LIGHT_MAGENTA ]
+    }
   end
 end
 
@@ -258,12 +613,15 @@ end
 # @author James Edward Gray II <http://graysoftinc.com/terminal-tricks/random-access-terminal>
 # @author Adam Parrott <parrott.adam@gmail.com>
 #
+# TODO: Move input loop checks to separate thread to help lag in
+#       full textured mode and low-framerate terminals?
+#
 module Input
   require 'io/console'
   require 'io/wait'
 
   # Since the require statement driving this condition could still fail
-  # on some Windows systems, this is not an ideal solution.  TODO: we should
+  # on some Windows systems, this is not an ideal solution.  TODO: We should
   # ask the OS to identify itself, then resolve from there. [ABP 201603013]
   #
   WINDOWS_INPUT = begin
@@ -353,7 +711,7 @@ class Pushwall < Cell
     @top         = @y_cell * Cell::HEIGHT
     @to_x_cell   = @x_cell
     @to_y_cell   = @y_cell
-    @value       = Cell::SECRET_CELL
+    @value       = Cell::PUSH_WALL
   end
 
   # Activates the pushwall in the desired direction.
@@ -466,13 +824,15 @@ class Pushwall < Cell
       @map[ @y_cell ][ @x_cell ] = @map[ @to_y_cell ][ @to_x_cell ]
       @map[ @y_cell ][ @x_cell ].offset = 0
       @map[ @y_cell ][ @x_cell ].state  = STATE_STOPPED
+      @map[ @y_cell ][ @x_cell ].texture_id = nil
       @map[ @y_cell ][ @x_cell ].value  = Cell::EMPTY_CELL
 
       @map[ @to_y_cell ][ @to_x_cell ] = self
-      @map[ @to_y_cell ][ @to_x_cell ].offset    = @push_amount
-      @map[ @to_y_cell ][ @to_x_cell ].state     = STATE_MOVING
-      @map[ @to_y_cell ][ @to_x_cell ].direction = @direction
-      @map[ @to_y_cell ][ @to_x_cell ].value     = Cell::SECRET_CELL
+      @map[ @to_y_cell ][ @to_x_cell ].direction  = @direction
+      @map[ @to_y_cell ][ @to_x_cell ].offset     = @push_amount
+      @map[ @to_y_cell ][ @to_x_cell ].state      = STATE_MOVING
+      @map[ @to_y_cell ][ @to_x_cell ].texture_id = @texture_id
+      @map[ @to_y_cell ][ @to_x_cell ].value      = Cell::PUSH_WALL
 
       if @map[ @next_y_cell ][ @next_x_cell ].value == Cell::EMPTY_CELL
         @x_cell    = @to_x_cell
@@ -485,18 +845,19 @@ class Pushwall < Cell
         @top       = @next_top + @push_amount
         @bottom    = @next_bottom + @push_amount
 
-        @map[ @to_y_cell ][ @to_x_cell ].offset    = @next_offset + @push_amount
-        @map[ @to_y_cell ][ @to_x_cell ].direction = @direction
-        @map[ @to_y_cell ][ @to_x_cell ].state     = STATE_MOVING
-        @map[ @to_y_cell ][ @to_x_cell ].value     = Cell::SECRET_CELL
-        @map[ @to_y_cell ][ @to_x_cell ].left      = @left
-        @map[ @to_y_cell ][ @to_x_cell ].right     = @right
-        @map[ @to_y_cell ][ @to_x_cell ].top       = @top
-        @map[ @to_y_cell ][ @to_x_cell ].bottom    = @bottom
+        @map[ @to_y_cell ][ @to_x_cell ].bottom     = @bottom
+        @map[ @to_y_cell ][ @to_x_cell ].direction  = @direction
+        @map[ @to_y_cell ][ @to_x_cell ].left       = @left
+        @map[ @to_y_cell ][ @to_x_cell ].offset     = @next_offset + @push_amount
+        @map[ @to_y_cell ][ @to_x_cell ].right      = @right
+        @map[ @to_y_cell ][ @to_x_cell ].state      = STATE_MOVING
+        @map[ @to_y_cell ][ @to_x_cell ].texture_id = @texture_id
+        @map[ @to_y_cell ][ @to_x_cell ].top        = @top
+        @map[ @to_y_cell ][ @to_x_cell ].value      = Cell::PUSH_WALL
 
       else
         @offset = 0
-        @value  = Cell::SECRET_CELL
+        @value  = Cell::PUSH_WALL
         @x_cell = @to_x_cell
         @y_cell = @to_y_cell
 
@@ -538,7 +899,7 @@ class Pushwall < Cell
       @to_offset = Cell::WIDTH
       @to_x_cell = @x_cell - 1
       @to_y_cell = @y_cell
-      @value     = Cell::SECRET_CELL
+      @value     = Cell::PUSH_WALL
 
     when MOVING_WEST
       return false if @map[ @y_cell ][ @x_cell + 1 ].value != Cell::EMPTY_CELL
@@ -549,7 +910,7 @@ class Pushwall < Cell
       @to_offset = -Cell::WIDTH
       @to_x_cell = @x_cell + 1
       @to_y_cell = @y_cell
-      @value     = Cell::SECRET_CELL
+      @value     = Cell::PUSH_WALL
 
     when MOVING_NORTH
       return false if @map[ @y_cell - 1 ][ @x_cell ].value != Cell::EMPTY_CELL
@@ -560,7 +921,7 @@ class Pushwall < Cell
       @to_offset = Cell::HEIGHT
       @to_x_cell = @x_cell
       @to_y_cell = @y_cell - 1
-      @value     = Cell::SECRET_CELL
+      @value     = Cell::PUSH_WALL
 
     when MOVING_SOUTH
       return false if @map[ @y_cell + 1 ][ @x_cell ].value != Cell::EMPTY_CELL
@@ -571,15 +932,123 @@ class Pushwall < Cell
       @to_offset = -Cell::HEIGHT
       @to_x_cell = @x_cell
       @to_y_cell = @y_cell + 1
-      @value     = Cell::SECRET_CELL
+      @value     = Cell::PUSH_WALL
     end
 
-    @map[ @to_y_cell ][ @to_x_cell ].direction = @direction
-    @map[ @to_y_cell ][ @to_x_cell ].offset    = @to_offset
-    @map[ @to_y_cell ][ @to_x_cell ].state     = STATE_MOVING
-    @map[ @to_y_cell ][ @to_x_cell ].value     = Cell::SECRET_CELL
+    @map[ @to_y_cell ][ @to_x_cell ].direction  = @direction
+    @map[ @to_y_cell ][ @to_x_cell ].offset     = @to_offset
+    @map[ @to_y_cell ][ @to_x_cell ].state      = STATE_MOVING
+    @map[ @to_y_cell ][ @to_x_cell ].texture_id = @texture_id
+    @map[ @to_y_cell ][ @to_x_cell ].value      = Cell::PUSH_WALL
 
     return true
+  end
+end
+
+# Defines a single wall texture.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+class Texture
+  DEFAULT_HEIGHT  = 32
+  DEFAULT_WIDTH   = 64
+  MAX_COLOR_VALUE = 255
+  MAX_PIXEL_VALUE = 255
+  MIN_COLOR_VALUE = 0
+  MIN_PIXEL_VALUE = 0
+  SHIFT_FACTOR    = 8
+
+  attr_reader :height
+  attr_reader :width
+
+  def initialize( args = {} )
+    @data   = args[ :data ]
+    @height = args[ :height ] || @data.size || DEFAULT_HEIGHT
+    @width  = args[ :width ] || @data[ 0 ][ 0 ].size || DEFAULT_WIDTH
+  end
+
+  def colors
+    @colors ||= decode_colors( @data.map { |item| item[ 1 ] } )
+  end
+
+  def self.encode_data( pixel_values, color_values )
+    colors = self.encode_colors( color_values )
+
+    pixel_values.map.with_index do |pixel, index|
+      [ pixel, colors[ index ] ]
+    end
+  end
+
+  def pixels
+    @pxiels ||= @data.map { |item| item[ 0 ] }
+  end
+
+  private
+
+  def decode_colors( colors )
+    decoded_colors = []
+
+    @height.times do |row|
+      values = []
+      datum = @data[ row ][ 1 ].to_i( 36 )
+
+      @width.times do |column|
+        values << ( datum >> ( column * SHIFT_FACTOR ) & MAX_COLOR_VALUE )
+      end
+
+      decoded_colors << values
+    end
+
+    decoded_colors
+  end
+
+  def decode_pixels( pixels )
+    decoded_pixels = []
+
+    @height.times do |row|
+      values = []
+      datum = @data[ row ][ 0 ].to_i( 36 )
+
+      @width.times do |column|
+        values << ( datum >> ( column * SHIFT_FACTOR ) & MAX_COLOR_VALUE )
+      end
+
+      decoded_pixels << values
+    end
+
+    decoded_pixels
+  end
+
+  def self.encode_colors( colors )
+    encoded_colors = []
+
+    colors.each do |row|
+      encoded_value = 0
+
+      row.each.with_index do |item, column|
+        encoded_value += item.to_i * ( 2 ** ( column * SHIFT_FACTOR ) )
+      end
+
+      encoded_colors << encoded_value.to_s( 36 )
+    end
+
+    encoded_colors
+  end
+
+  def self.encode_pixels( pixels )
+    encoded_pixels = []
+
+    pixels.each do |row|
+      encoded_value = 0
+
+      row.each_char.with_index do |item, column|
+        encoded_value += item.ord * ( 2 ** ( column * SHIFT_FACTOR ) )
+      end
+
+      encoded_pixels << encoded_value.to_s( 36 )
+    end
+
+    encoded_pixels
   end
 end
 
@@ -665,8 +1134,10 @@ class Game
   # @param angle   [Float]   Starting viewing angle to use for casting
   #
   def cast_x_ray( x_start, y_start, angle )
-    @x_ray_dist = 0
+    @x_offset = 0
+    @x_push_offset = 0
     @x_push_dist = 1e+8
+    @x_ray_dist = 0
     @x_x_cell = 0
     @x_y_cell = 0
 
@@ -733,7 +1204,7 @@ class Game
 
       next if @push_map_cell.nil?
 
-      if @push_map_cell.value == Cell::SECRET_CELL \
+      if @push_map_cell.value == Cell::PUSH_WALL \
          && ( pushwall.x_cell == @push_x_cell || pushwall.to_x_cell == @push_x_cell ) \
          && ( pushwall.y_cell == @push_y_cell || pushwall.to_y_cell == @push_y_cell )
 
@@ -741,6 +1212,7 @@ class Game
 
         if @push_dist < @x_push_dist
           @x_push_dist = @push_dist
+          @x_push_intercept = @push_y_intercept
           @x_push_x_cell = @push_x_cell
           @x_push_y_cell = @push_y_cell
           @x_push_map_cell = @push_map_cell
@@ -768,18 +1240,22 @@ class Game
       when Cell::END_CELL
         break
       when Cell::DOOR_CELL
+        @y_intercept += ( @y_step[ angle ] / 2 )
+
         if @x_map_cell.offset < ( @y_intercept % Cell::HEIGHT )
-          @y_intercept += ( @y_step[ angle ] / 2 )
+          @x_offset = @x_map_cell.offset
           break
         end
-      when Cell::SECRET_CELL
+      when Cell::PUSH_WALL
         case @x_map_cell.state
         when Pushwall::STATE_MOVING
           case @x_map_cell.direction
           when Cell::MOVING_NORTH, Cell::MOVING_SOUTH
             if @x_map_cell.offset >= 0 && ( @y_intercept % Cell::HEIGHT ) > @x_map_cell.offset
+              @x_offset = @x_map_cell.offset
               break
             elsif @x_map_cell.offset < 0 && ( @y_intercept % Cell::HEIGHT ) < ( Cell::WIDTH + @x_map_cell.offset )
+              @x_offset = @x_map_cell.offset
               break
             end
           when Cell::MOVING_EAST, Cell::MOVING_WEST
@@ -790,7 +1266,7 @@ class Game
         when Pushwall::STATE_STOPPED, Pushwall::STATE_FINISHED
           break
         end
-      when Cell::WALL_CELLS.first..Cell::WALL_CELLS.last
+      when Cell::WALL_CELL
         break
       end
 
@@ -805,9 +1281,12 @@ class Game
     end
 
     if @x_push_dist < @x_ray_dist
+      @y_intercept = @x_push_intercept
       @x_map_cell = @x_push_map_cell
+      @x_offset = @x_push_offset
       @x_x_cell = @x_push_x_cell
       @x_y_cell = @x_push_y_cell
+
       return @x_push_dist
     else
       return @x_ray_dist
@@ -821,8 +1300,10 @@ class Game
   # @param angle   [Float]   Starting viewing angle to use for casting
   #
   def cast_y_ray( x_start, y_start, angle )
-    @y_ray_dist = 0
     @y_push_dist = 1e+8
+    @y_push_offset = 0
+    @y_offset = 0
+    @y_ray_dist = 0
     @y_x_cell = 0
     @y_y_cell = 0
 
@@ -889,7 +1370,7 @@ class Game
 
       next if @push_map_cell.nil?
 
-      if @push_map_cell.value == Cell::SECRET_CELL \
+      if @push_map_cell.value == Cell::PUSH_WALL \
          && ( pushwall.x_cell == @push_x_cell || pushwall.to_x_cell == @push_x_cell ) \
          && ( pushwall.y_cell == @push_y_cell || pushwall.to_y_cell == @push_y_cell )
 
@@ -897,6 +1378,7 @@ class Game
 
         if @push_dist < @y_push_dist
           @y_push_dist = @push_dist
+          @y_push_intercept = @push_x_intercept
           @y_push_x_cell = @push_x_cell
           @y_push_y_cell = @push_y_cell
           @y_push_map_cell = @push_map_cell
@@ -924,18 +1406,22 @@ class Game
       when Cell::END_CELL
         break
       when Cell::DOOR_CELL
+        @x_intercept += ( @x_step[ angle ] / 2 )
+
         if @y_map_cell.offset < ( @x_intercept % Cell::WIDTH )
-          @x_intercept += ( @x_step[ angle ] / 2 )
+          @y_offset = @y_map_cell.offset
           break
         end
-      when Cell::SECRET_CELL
+      when Cell::PUSH_WALL
         case @y_map_cell.state
         when Pushwall::STATE_MOVING
           case @y_map_cell.direction
           when Cell::MOVING_EAST, Cell::MOVING_WEST
             if @y_map_cell.offset >= 0 && ( @x_intercept % Cell::WIDTH ) > @y_map_cell.offset
+              @y_offset = @y_map_cell.offset
               break
             elsif @y_map_cell.offset < 0 && ( @x_intercept % Cell::WIDTH ) < ( Cell::WIDTH + @y_map_cell.offset )
+              @y_offset = @y_map_cell.offset
               break
             end
           when Cell::MOVING_NORTH, Cell::MOVING_SOUTH
@@ -946,7 +1432,7 @@ class Game
         when Pushwall::STATE_STOPPED, Pushwall::STATE_FINISHED
           break
         end
-      when Cell::WALL_CELLS.first..Cell::WALL_CELLS.last
+      when Cell::WALL_CELL
         break
       end
 
@@ -961,9 +1447,12 @@ class Game
     end
 
     if @y_push_dist < @y_ray_dist
+      @x_intercept = @y_push_intercept
       @y_map_cell = @y_push_map_cell
+      @y_offset = @y_push_offset
       @y_x_cell = @y_push_x_cell
       @y_y_cell = @y_push_y_cell
+
       return @y_push_dist
     else
       return @y_ray_dist
@@ -981,7 +1470,7 @@ class Game
     if @player_move_x == 0 && @player_move_y == 0
       @map_cell = @map[ @y_cell ][ @x_cell + 1 ]
 
-      if @map_cell.value == Cell::SECRET_CELL \
+      if @map_cell.value == Cell::PUSH_WALL \
         && @map_cell.direction == Cell::MOVING_EAST \
         && @player_x >= ( @map_cell.left.to_i - ( Cell::WIDTH - Cell::MARGIN ) )
 
@@ -990,7 +1479,7 @@ class Game
 
       @map_cell = @map[ @y_cell ][ @x_cell - 1 ]
 
-      if @map_cell.value == Cell::SECRET_CELL \
+      if @map_cell.value == Cell::PUSH_WALL \
         && @map_cell.direction == Cell::MOVING_WEST \
         && @player_x <= @map_cell.right.to_i + Cell::MARGIN
 
@@ -999,7 +1488,7 @@ class Game
 
       @map_cell = @map[ @y_cell + 1 ][ @x_cell ]
 
-      if @map_cell.value == Cell::SECRET_CELL \
+      if @map_cell.value == Cell::PUSH_WALL \
         && @map_cell.direction == Cell::MOVING_NORTH \
         && @player_y >= ( @map_cell.top.to_i - ( Cell::HEIGHT - Cell::MARGIN ) )
 
@@ -1008,7 +1497,7 @@ class Game
 
       @map_cell = @map[ @y_cell - 1 ][ @x_cell ]
 
-      if @map_cell.value == Cell::SECRET_CELL \
+      if @map_cell.value == Cell::PUSH_WALL \
         && @map_cell.direction == Cell::MOVING_SOUTH \
         && @player_y <= ( @map_cell.bottom.to_i + Cell::MARGIN )
 
@@ -1028,7 +1517,7 @@ class Game
       elsif @map_cell.value == Cell::DOOR_CELL \
          && @map_cell.state == Door::STATE_OPEN
         # Let the player pass through the open door...
-      elsif @map_cell.value == Cell::SECRET_CELL \
+      elsif @map_cell.value == Cell::PUSH_WALL \
          && @map_cell.state == Pushwall::STATE_MOVING
 
         if @player_x >= ( @map_cell.left.to_i - ( Cell::WIDTH - Cell::MARGIN ) )
@@ -1050,7 +1539,7 @@ class Game
       elsif @map_cell.value == Cell::DOOR_CELL \
          && @map_cell.state == Door::STATE_OPEN
         # Let the player pass through the open door...
-      elsif @map_cell.value == Cell::SECRET_CELL \
+      elsif @map_cell.value == Cell::PUSH_WALL \
          && @map_cell.state == Pushwall::STATE_MOVING
 
         if @player_x <= ( @map_cell.right.to_i + Cell::MARGIN )
@@ -1073,7 +1562,7 @@ class Game
       elsif @map_cell.value == Cell::DOOR_CELL \
          && @map_cell.state == Door::STATE_OPEN
         # Let the player pass through the open door...
-      elsif @map_cell.value == Cell::SECRET_CELL \
+      elsif @map_cell.value == Cell::PUSH_WALL \
          && @map_cell.state == Pushwall::STATE_MOVING
 
         if @player_y >= ( @map_cell.top.to_i - ( Cell::HEIGHT - Cell::MARGIN ) )
@@ -1095,7 +1584,7 @@ class Game
       elsif @map_cell.value == Cell::DOOR_CELL \
          && @map_cell.state == Door::STATE_OPEN
         # Let the player pass through the open door...
-      elsif @map_cell.value == Cell::SECRET_CELL \
+      elsif @map_cell.value == Cell::PUSH_WALL \
          && @map_cell.state == Pushwall::STATE_MOVING
 
         if @player_y <= ( @map_cell.bottom.to_i + Cell::MARGIN )
@@ -1125,6 +1614,7 @@ class Game
     case key
       # Escape
       when "\e"
+        Input.clear_input
 
       # Backspace
       when "\177"
@@ -1198,8 +1688,8 @@ class Game
 
       when "a"
         # Player is attempting to strafe left
-        @player_move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
-        @player_move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] ) % @angles[ 360 ] ] * movement_step ).round
+        @player_move_x = ( @cos_table[ ( @player_angle - @angles[ 90 ] + @angles[ 360 ] ) % @angles[ 360 ] ] * movement_step ).round
+        @player_move_y = ( @sin_table[ ( @player_angle - @angles[ 90 ] + @angles[ 360 ] ) % @angles[ 360 ] ] * movement_step ).round
 
       when "d"
         # Player is attempting to strafe right
@@ -1255,6 +1745,9 @@ class Game
 
       when "r"
         load __FILE__
+
+      when "t"
+        @draw_textures = !@draw_textures
 
       end
   end
@@ -1380,22 +1873,28 @@ class Game
       if @x_dist < @y_dist
         @cast[ ray ] =
         {
+          dark_wall: true,
           dist: @x_dist,
+          intercept: @y_intercept,
           map_x: @x_x_cell,
           map_y: @x_y_cell,
           map_type: @x_map_cell.value,
+          offset: @x_offset,
           scale: ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @x_dist ) ) ).round,
-          dark_wall: true
+          texture_id: @x_map_cell.texture_id
         }
       else
         @cast[ ray ] =
         {
+          dark_wall: false,
           dist: @y_dist,
+          intercept: @x_intercept,
           map_x: @y_x_cell,
           map_y: @y_y_cell,
           map_type: @y_map_cell.value,
+          offset: @y_offset,
           scale: ( @fish_eye_table[ ray ] * ( 2048 / ( 1e-10 + @y_dist ) ) ).round,
-          dark_wall: false
+          texture_id: @y_map_cell.texture_id
         }
       end
 
@@ -1409,20 +1908,44 @@ class Game
     @cast.each_with_index do |ray, index|
       next if ray.nil?
 
-      @wall_scale = ( clip_value( ray[ :scale ], 0, @screen_height ) / 2 ).to_i
-      @wall_top = ( @screen_height / 2 ) - @wall_scale
-      @wall_bottom = ( @screen_height / 2 ) + @wall_scale
+      @wall_type = ray[ :map_type ]
+      @wall_height = ray[ :scale ].to_i >> 1 << 1
+      @wall_trim = [ ( @wall_height - @screen_height ) / 2, 0 ].max
+      @wall_padding = [ ( @screen_height - @wall_height ) / 2, 0 ].max
+      @wall_texture = ray[ :texture_id ]
 
-      @wall_color = @wall_colors[ ray[ :map_type ] ][ ray[ :dark_wall ] ? 0 : 1 ]
-      @wall_sliver = Color.colorize( ray[ :map_type ], @wall_color, @color_mode )
-      @ceiling_sliver = Color.colorize( @ceiling_texture, @ceiling_color, @color_mode )
-      @floor_sliver = Color.colorize( @floor_texture, @floor_color, @color_mode )
+      if @draw_textures
+        @wall_pixels = ""
 
-      @slice  = "#{ @ceiling_sliver }," * [ @wall_top - 1, 0 ].max
-      @slice += "#{ @wall_sliver },"    * ( @wall_bottom - @wall_top + 1 )
-      @slice += "#{ @floor_sliver },"   * [ @screen_height - @wall_bottom, 0 ].max
+        @texture = @textures[ @wall_texture ]
+        @texel_factor = @texture.height / @wall_height.to_f
+        @texel_x = ( ray[ :intercept ].to_i - ray[ :offset ] ) % Cell::WIDTH 
 
-      @sliver = @slice.split( "," )
+        for i in 0..@wall_height
+          next unless i.between? @wall_trim, @wall_height - @wall_trim
+
+          @texel_y = clip_value( ( i * @texel_factor ).to_i , 0, @texture.height - 1 )
+
+          case @color_mode
+          when Color::MODE_NONE
+            @texel = @texture.pixels[ @texel_y ][ @texel_x ]
+          when Color::MODE_PARTIAL
+            @texel = "\e[38;5;#{ @texture.colors[ @texel_y ][ @texel_x ] }m#{ @texture.pixels[ @texel_y ][ @texel_x ] }\e[0;0m"
+          when Color::MODE_FILL
+            @texel = "\e[1;38;5;#{ @texture.colors[ @texel_y ][ @texel_x ] }m%\e[0;0m"
+          end
+
+          @wall_pixels += "#{ @texel },"
+        end
+      else
+        @wall_color = @wall_colors[ @wall_texture ][ ray[ :dark_wall ] ? 0 : 1 ]
+        @wall_texel = Color.colorize( @wall_type, @wall_color, @color_mode )
+        @wall_pixels = "#{ @wall_texel }," * clip_value( @wall_height, 0, @screen_height )
+      end
+
+      @ceiling_pixels = "#{ Color.colorize( @ceiling_texture, @ceiling_color, @color_mode ) }," * @wall_padding
+      @floor_pixels = "#{ Color.colorize( @floor_texture, @floor_color, @color_mode ) }," * @wall_padding
+      @sliver = "#{ @ceiling_pixels }#{ @wall_pixels }#{ @floor_pixels }".split( "," )
 
       for y in 0...@screen_height
         @buffer[ y ][ index ] = @sliver[ y ]
@@ -1492,50 +2015,55 @@ class Game
 
     @map = \
     [
-      %w( 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 2 2 2 2 ),
-      %w( 5 . . . . . . . . . . . . . . . . . 4 4 . . . . . . . . | . . 2 ),
-      %w( 5 . . . . . . . 6 6 6 . . . . . . . 4 4 . . . . . . . 4 2 2 . 2 ),
-      %w( 5 . . . . . . . 6 M 6 . . . . . . . 4 4 . m . . . . . 4 2 2 . 2 ),
-      %w( 5 . . . . . . 6 6 . 6 6 . . . . . . 4 4 . . m . . . . 4 2 2 . 2 ),
-      %w( 5 . . . 6 . . . . . . . . . 6 . . . 4 4 . . . m . . . 4 2 . . 2 ),
-      %w( 5 . 6 6 6 . . . . . . . . . 6 6 6 . 4 4 . . . . . . . 4 2 . 2 2 ),
-      %w( 5 . 6 m . . . . 3 . 3 m . . . . 6 . 4 4 . 3 . . . 3 . 4 2 . 2 2 ),
-      %w( 5 . 6 6 6 . . . . . . . . . 6 6 6 . 4 4 . . . . . . . 4 2 . 2 2 ),
-      %w( 5 . . . 6 . . . . . . . . . 6 . . . 4 4 . . . m . . . 4 2 . . 2 ),
-      %w( 5 . . . . . . 6 6 . 6 6 . . . . . . 4 4 . . . . m . . 4 2 2 . 2 ),
-      %w( 5 . . . . . . . 6 E 6 . . . . . . . 4 4 . . . . . m . 4 2 2 . 2 ),
-      %w( 5 . . . . . . . 6 6 6 . . . . . . . 4 4 . . . . . . . 4 2 2 . 2 ),
-      %w( 5 . . . . . . . . . . . . . . . . . 4 4 . . . . . . . 4 2 . . 2 ),
-      %w( 5 5 5 5 5 5 5 - 5 5 5 5 5 5 5 5 5 5 5 4 4 4 4 - 4 4 4 4 2 . 2 2 ),
-      %w( 5 5 . . 5 . . . . . 5 4 4 4 4 4 4 4 4 4 . . . . . . . 4 2 . 2 2 ),
-      %w( 5 5 . . | . . . . . 5 . . . . . . . . . . . . . . . . 4 2 . 2 2 ),
-      %w( 5 . . . 5 . . . . . | . . . . . . . . . . . . . . . . 4 2 . . 2 ),
-      %w( 5 . . . 5 5 5 5 5 5 5 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 2 . . 2 ),
-      %w( 2 P 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 P 2 ),
-      %w( 2 . . . 2 2 2 . . . 2 1 M 1 . . . . . . 1 M 1 1 . . . . 2 . . 2 ),
-      %w( 2 . . . 2 2 2 . . . 2 . . . . . . . . . . . . 1 . . . . 2 . . 2 ),
-      %w( 2 . . . 2 2 2 . . . 2 . . . . . . . . . . . . 1 . . . . | . . 2 ),
-      %w( 2 2 - 2 2 2 2 2 - 2 2 . . . . . . . . . . . . 1 . . . . 2 . . 2 ),
-      %w( 2 . . . . . . . . . 2 . . . . 3 . . 3 . . . . 1 . . . . 2 2 2 2 ),
-      %w( 2 . . . . . . . . . | . . . . . . . . . . . . | . . . . 2 2 2 2 ),
-      %w( 2 . . . . . . . . . 2 . . . . 3 . . 3 . . . . 1 . . . . 2 2 2 2 ),
-      %w( 2 2 - 2 2 2 2 2 - 2 2 . . . . . . . . . . . . 1 . . . . 2 . . 2 ),
-      %w( 2 . . . 2 2 2 . . . 2 . . . . . . . . . . . . 1 . . . . | . . 2 ),
-      %w( 2 . . . 2 2 2 . . . 2 . M . . . . . . . . M . 1 . . . . 2 . . 2 ),
-      %w( 2 . ^ . 2 2 2 . . . 2 1 . 1 . . . . . . 1 . 1 1 . . . . 2 . . 2 ),
-      %w( 2 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 )
+      %w( W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W4 W4 W4 W4 W4 W4 W4 W4 W4 W2 W2 W2 W2 ),
+      %w( W5 .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. W4 W4 .. .. .. .. .. .. .. .. D| .. .. W2 ),
+      %w( W5 .. .. .. .. .. .. .. W6 W6 W6 .. .. .. .. .. .. .. W4 W4 .. .. .. .. .. .. .. W4 W2 .. .. W2 ),
+      %w( W5 .. .. .. .. .. .. .. W6 EE W6 .. .. .. .. .. .. .. W4 W4 .. >9 .. .. .. .. .. W4 W2 W2 .. W2 ),
+      %w( W5 .. .. .. .. .. .. W6 W6 .. W6 W6 .. .. .. .. .. .. W4 W4 .. .. >9 .. .. .. .. W4 W2 W2 P2 W2 ),
+      %w( W5 .. .. .. W6 .. .. .. .. .. .. .. .. .. W6 .. .. .. W4 W4 .. .. .. >9 .. .. .. W4 W2 .. .. W2 ),
+      %w( W5 .. W6 W6 W6 .. .. .. .. .. .. .. .. .. W6 W6 W6 .. W4 W4 .. .. .. .. .. .. .. W4 W2 .. .. W2 ),
+      %w( W5 .. W6 >9 .. .. .. .. W5 .. W5 .. .. .. .. <9 W6 .. W4 W4 .. W3 .. .. .. W3 .. W4 W2 .. W2 W2 ),
+      %w( W5 .. W6 W6 W6 .. .. .. .. .. .. .. .. .. W6 W6 W6 .. W4 W4 .. .. .. .. .. .. .. W4 W2 .. W2 W2 ),
+      %w( W5 .. .. .. W6 .. .. .. .. .. .. .. .. .. W6 .. .. .. W4 W4 .. .. .. <9 .. .. .. W4 W2 .. .. W2 ),
+      %w( W5 .. .. .. .. .. .. W6 W6 .. W6 W6 .. .. .. .. .. .. W4 W4 .. .. .. .. <9 .. .. W4 W2 W2 .. W2 ),
+      %w( W5 .. .. .. .. .. .. .. W6 ^9 W6 .. .. .. .. .. .. .. W4 W4 .. .. .. .. .. <9 .. W4 W2 W2 .. W2 ),
+      %w( W5 .. .. .. .. .. .. .. W6 W6 W6 .. .. .. .. .. .. .. W4 W4 .. .. .. .. .. .. .. W4 W2 W2 .. W2 ),
+      %w( W5 .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. W4 W4 .. .. .. .. .. .. .. W4 W2 .. .. W2 ),
+      %w( W5 W5 W5 W5 W5 W5 W5 D- W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W5 W4 W4 W4 W4 D- W4 W4 W4 W4 W2 .. W2 W2 ),
+      %w( W5 W5 .. .. W5 .. .. .. .. .. W5 W4 W4 W4 W4 W4 W4 W4 W4 W4 .. .. .. .. .. .. .. W4 W2 .. W2 W2 ),
+      %w( W5 W5 .. .. D| .. .. .. .. .. W5 .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. W4 W2 .. W2 W2 ),
+      %w( W5 .. .. .. W5 .. .. .. .. .. D| .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. .. W4 W2 .. .. W2 ),
+      %w( W5 .. .. .. W5 W5 W5 W5 W5 W5 W5 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W4 W2 .. .. W2 ),
+      %w( W3 P3 W3 W3 W3 W3 W3 W3 W3 W3 W2 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W2 W2 W2 W2 W2 W2 P2 W2 ),
+      %w( W3 .. .. .. W3 W3 W3 .. .. .. W2 W1 v9 W1 .. .. .. .. .. .. W1 v9 W1 W1 .. .. .. .. W2 .. .. W2 ),
+      %w( W3 .. .. .. W3 W3 W3 .. .. .. W2 .. .. .. .. .. .. .. .. .. .. .. .. W1 .. .. .. .. W2 .. .. W2 ),
+      %w( W3 .. .. .. W3 W3 W3 .. .. .. W2 .. .. .. .. .. .. .. .. .. .. .. .. W1 .. .. .. .. D| .. .. W2 ),
+      %w( W3 W3 D- W3 W3 W3 W3 W3 D- W3 W2 .. .. .. .. .. .. .. .. .. .. .. .. W1 .. .. .. .. W2 .. .. W2 ),
+      %w( W2 .. .. .. .. .. .. .. .. .. W2 .. .. .. .. W9 .. .. W9 .. .. .. .. W1 .. .. .. .. W2 W2 W2 W2 ),
+      %w( W2 .. .. .. .. .. .. .. .. .. D| .. .. .. .. .. .. .. .. .. .. .. .. D| .. .. .. .. W2 W2 W2 W2 ),
+      %w( W2 .. .. .. .. .. .. .. .. .. W2 .. .. .. .. W9 .. .. W9 .. .. .. .. W1 .. .. .. .. W2 W2 W2 W2 ),
+      %w( W2 W2 D- W2 W2 W2 W2 W2 D- W2 W2 .. .. .. .. .. .. .. .. .. .. .. .. W1 .. .. .. .. W2 .. .. W2 ),
+      %w( W2 .. .. .. W2 W2 W2 .. .. .. W2 .. .. .. .. .. .. .. .. .. .. .. .. W1 .. .. .. .. D| .. .. W2 ),
+      %w( W2 .. S^ .. W2 W2 W2 .. .. .. W2 .. ^9 .. .. .. .. .. .. .. .. ^9 .. W1 .. .. .. .. W2 .. .. W2 ),
+      %w( W2 .. .. .. W2 W2 W2 .. .. .. W2 W1 .. W1 .. .. .. .. .. .. W1 .. W1 W1 .. .. .. .. W2 .. .. W2 ),
+      %w( W2 W2 W2 W2 W2 W2 W2 W2 W2 W2 W2 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W2 W2 W2 W2 W2 W2 W2 W2 )
     ]
 
     for y in 0...@map_rows
       for x in 0...@map_columns
-        if Cell::DOOR_CELLS.include? @map[ y ][ x ]
+        @cell_type = @map[ y ][ x ][ 0 ]
+        @cell_modifier = @map[ y ][ x ][ 1 ]
+
+        case @cell_type
+        when Cell::DOOR_CELL
           @map[ y ][ x ] = Door.new(
             map: @map,
+            texture_id: @cell_type,
             x_cell: x,
             y_cell: y
           )
 
-        elsif @map[ y ][ x ] == Cell::MAGIC_CELL
+        when Cell::MAGIC_CELL
           @map[ y ][ x ] = Cell.new(
             map: @map,
             x_cell: x,
@@ -1545,15 +2073,15 @@ class Game
           @magic_x = x * Cell::WIDTH + ( Cell::WIDTH / 2 )
           @magic_y = y * Cell::HEIGHT + ( Cell::HEIGHT / 2 )
 
-        elsif Cell::PLAYER_CELLS.include? @map[ y ][ x ]
-          case @map[ y ][ x ]
-          when Cell::PLAYER_UP
+        when Cell::PLAYER_CELL
+          case @cell_modifier
+          when Cell::DIRECTION_UP
             @player_starting_angle = @angles[ 270 ]
-          when Cell::PLAYER_DOWN
+          when Cell::DIRECTION_DOWN
             @player_starting_angle = @angles[ 90 ]
-          when Cell::PLAYER_LEFT
+          when Cell::DIRECTION_LEFT
             @player_starting_angle = @angles[ 180 ]
-          when Cell::PLAYER_RIGHT
+          when Cell::DIRECTION_RIGHT
             @player_starting_angle = @angles[ 0 ]
           end
 
@@ -1566,36 +2094,54 @@ class Game
           @player_starting_x = x * Cell::WIDTH + ( Cell::WIDTH / 2 )
           @player_starting_y = y * Cell::HEIGHT + ( Cell::HEIGHT / 2 )
 
-        elsif Cell::MOVE_WALLS.include? @map[ y ][ x ]
-          case @map[ y ][ x ]
-          when Cell::MOVE_WALL_HORZ
-            @push_direction = Cell::MOVING_WEST
-          when Cell::MOVE_WALL_VERT
+        when Cell::DIRECTION_DOWN,
+             Cell::DIRECTION_LEFT,
+             Cell::DIRECTION_RIGHT,
+             Cell::DIRECTION_UP
+
+          case @cell_type
+          when Cell::DIRECTION_DOWN
             @push_direction = Cell::MOVING_SOUTH
+          when Cell::DIRECTION_LEFT
+            @push_direction = Cell::MOVING_EAST
+          when Cell::DIRECTION_RIGHT
+            @push_direction = Cell::MOVING_WEST
+          when Cell::DIRECTION_UP
+            @push_direction = Cell::MOVING_NORTH
           end
 
           @map[ y ][ x ] = Pushwall.new(
-            map: @map,
-            x_cell: x,
-            y_cell: y,
             direction: @push_direction,
-            type: Pushwall::TYPE_MOVE
+            map: @map,
+            texture_id: @cell_modifier,
+            type: Pushwall::TYPE_MOVE,
+            x_cell: x,
+            y_cell: y
           )
 
           @movewalls << @map[ y ][ x ]
 
-        elsif @map[ y ][ x ] == Cell::SECRET_CELL
+        when Cell::PUSH_WALL
           @map[ y ][ x ] = Pushwall.new(
             map: @map,
+            texture_id: @cell_modifier,
+            type: Pushwall::TYPE_PUSH,
             x_cell: x,
-            y_cell: y,
-            type: Pushwall::TYPE_PUSH
+            y_cell: y
+          )
+
+        when Cell::END_CELL, Cell::WALL_CELL
+          @map[ y ][ x ] = Cell.new(
+            map: @map,
+            texture_id: @cell_modifier,
+            value: @cell_type,
+            x_cell: x,
+            y_cell: y
           )
 
         else
           @map[ y ][ x ] = Cell.new(
             map: @map,
-            value: @map[ y ][ x ],
             x_cell: x,
             y_cell: y
           )
@@ -1662,19 +2208,13 @@ class Game
       @fish_eye_table[ angle + @angles[ @half_fov ] ] = 1.0 / cos( rad_angle )
     end
 
-    # Configure some basic lookup tables for our wall colors.
+    # Configure our textures and wall color tables.
     #
-    @wall_colors[ '1' ] = [ Color::BLUE, Color::LIGHT_BLUE ]
-    @wall_colors[ '2' ] = [ Color::GREEN, Color::LIGHT_GREEN ]
-    @wall_colors[ '3' ] = [ Color::YELLOW, Color::LIGHT_YELLOW ]
-    @wall_colors[ '4' ] = [ Color::CYAN, Color::LIGHT_CYAN ]
-    @wall_colors[ '5' ] = [ Color::BLUE, Color::LIGHT_BLUE ]
-    @wall_colors[ '6' ] = [ Color::GREEN, Color::LIGHT_GREEN ]
-    @wall_colors[ '7' ] = [ Color::YELLOW, Color::LIGHT_YELLOW ]
-    @wall_colors[ '8' ] = [ Color::CYAN, Color::LIGHT_CYAN ]
-    @wall_colors[ 'D' ] = [ Color::MAGENTA, Color::LIGHT_MAGENTA ]
-    @wall_colors[ 'E' ] = [ Color::WHITE, Color::WHITE ]
-    @wall_colors[ 'P' ] = [ Color::RED, Color::LIGHT_RED ]
+    @textures = GameData.textures.update( GameData.textures ) do |key, value|
+      Texture.new( data: value )
+    end
+
+    @wall_colors = GameData.wall_colors
 
     # Configure our snarky HUD messages to the player.
     #
@@ -1720,8 +2260,8 @@ class Game
     @buffer = Array.new( @screen_height ) { Array.new( @screen_width ) }
 
     @fixed_factor = 512
-    @fixed_count = ( 360 * @screen_width ) / @player_fov
-    @fixed_step = @fixed_count / 360.0
+    @fixed_angles = ( 360 * @screen_width ) / @player_fov
+    @fixed_step = @fixed_angles / 360.0
 
     @frame_rate = 0.0
     @frames_rendered = 0
@@ -1729,21 +2269,22 @@ class Game
 
     # Define default colors and textures.
     #
-    @default_ceiling_color = Color::LIGHT_GRAY
+    @default_ceiling_color = Color::MAGENTA
     @default_ceiling_texture = "@"
     @default_floor_color = Color::GRAY
-    @default_floor_texture = "-"
+    @default_floor_texture = "@"
     @default_wall_texture = "#"
 
     @ceiling_color = @default_ceiling_color
     @ceiling_texture = @default_ceiling_texture
     @floor_color = @default_floor_color
-    @floor_texture = " "
+    @floor_texture = @default_floor_texture
     @wall_texture = @default_wall_texture
 
     @draw_ceiling = true
-    @draw_floor = false
+    @draw_floor = true
     @draw_walls = true
+    @draw_textures = true
 
     # Define miscellaneous game variables.
     #
@@ -1828,8 +2369,9 @@ class Game
 
     @play_count += 1
 
-    reset_player
-    reset_map
+    initialize
+    activate_movewalls
+    reset_timers
     clear_screen true
     update_buffer
   end
@@ -1875,26 +2417,27 @@ class Game
     puts
     puts "[ Keys ]".center( @screen_width )
     puts
-    puts ( "Move forward".ljust( 25 )   + "Up Arrow, W".rjust( 25 ) ).center( @screen_width )
-    puts ( "Move backward".ljust( 25 )  + "Down Arrow, S".rjust( 25 ) ).center( @screen_width )
-    puts ( "Strafe left".ljust( 25 )    + "A".rjust( 25 ) ).center( @screen_width )
-    puts ( "Strafe right".ljust( 25 )   + "D".rjust( 25 ) ).center( @screen_width )
-    puts ( "Turn left".ljust( 25 )      + "Left Arrow, K".rjust( 25 ) ).center( @screen_width )
-    puts ( "Turn right".ljust( 25 )     + "Right Arrow, L".rjust( 25 ) ).center( @screen_width )
+    puts ( "Move forward".ljust( 25 )   + "Up Arrow, w".rjust( 25 ) ).center( @screen_width )
+    puts ( "Move backward".ljust( 25 )  + "Down Arrow, s".rjust( 25 ) ).center( @screen_width )
+    puts ( "Strafe left".ljust( 25 )    + "a".rjust( 25 ) ).center( @screen_width )
+    puts ( "Strafe right".ljust( 25 )   + "d".rjust( 25 ) ).center( @screen_width )
+    puts ( "Turn left".ljust( 25 )      + "Left Arrow, k".rjust( 25 ) ).center( @screen_width )
+    puts ( "Turn right".ljust( 25 )     + "Right Arrow, l".rjust( 25 ) ).center( @screen_width )
     puts
     puts ( "Open doors/activate walls".ljust( 25 ) + "Space".rjust( 25 ) ).center( @screen_width )
     puts
-    puts ( "Toggle ceiling".ljust( 25 )    + "C".rjust( 25 ) ).center( @screen_width )
-    puts ( "Toggle debug info".ljust( 25 ) + "I".rjust( 25 ) ).center( @screen_width )
-    puts ( "Toggle floor".ljust( 25 )      + "F".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle ceiling".ljust( 25 )    + "c".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle debug info".ljust( 25 ) + "i".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle floor".ljust( 25 )      + "f".rjust( 25 ) ).center( @screen_width )
+    puts ( "Toggle texturing".ljust( 25 )  + "t".rjust( 25 ) ).center( @screen_width )
     puts
     puts Color.colorize( ( "No color".ljust( 25 )      + "1".rjust( 25 ) ).center( @screen_width ), Color::BLUE, 2 )
     puts Color.colorize( ( "Partial color".ljust( 25 ) + "2".rjust( 25 ) ).center( @screen_width ), Color::GREEN, 2 )
     puts Color.colorize( ( "Full color".ljust( 25 )    + "3".rjust( 25 ) ).center( @screen_width ), Color::YELLOW, 2 )
     puts
     puts ( "Debug screen".ljust( 25 )   + "?".rjust( 25 ) ).center( @screen_width )
-    puts ( "Help screen".ljust( 25 )    + "H".rjust( 25 ) ).center( @screen_width )
-    puts ( "Quit game".ljust( 25 )      + "Q".rjust( 25 ) ).center( @screen_width )
+    puts ( "Help screen".ljust( 25 )    + "h".rjust( 25 ) ).center( @screen_width )
+    puts ( "Quit game".ljust( 25 )      + "q".rjust( 25 ) ).center( @screen_width )
     puts
     puts "Press any key to continue...".center( @screen_width )
     puts
