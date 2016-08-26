@@ -143,7 +143,7 @@ For the curious, here's a short summary table highlighting various milestones fr
 | Release | Notable features                                |
 |---------|-------------------------------------------------|
 | 0.9.0   | Ceiling and floor textures                      |
-|         | Add in-game system messages                     |
+|         | In-game system messages                         |
 | 0.8.0   | Wall textures                                   |
 | 0.7.0   | Multi-direction pushwalls                       |
 |         | Multi-direction moving walls                    |
