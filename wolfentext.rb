@@ -30,7 +30,7 @@
 #                                                                               #
 #################################################################################
 
-VERSION = "0.8.0"
+VERSION = "0.9.0"
 
 # Defines a single map cell in the current world map.
 #
@@ -143,6 +143,17 @@ module Color
     end
   end
 
+  def self.texturize( value, color, mode = 0 )
+    case mode
+    when MODE_NONE
+      value
+    when MODE_PARTIAL
+      "\e[38;5;#{ color }m#{ value }\e[0;0m"
+    when MODE_FILL
+      "\e[1;38;5;#{ color }m#\e[0;0m"
+    end
+  end
+
   private
 
   # Tests whether a given color index is light or dark.
@@ -232,12 +243,26 @@ class GameData
     # ]
   end
 
-  # Command reference for generating texture data from images:
-  #   ASCII character data
-  #     @see http://www.text-image.com/convert/ascii.html
-  #   Color map data
-  #     @see https://github.com/tzvetkoff/im2a
-  #     im2a --height=32 --width=64 <file.png> > out.txt
+  # Steps for generating texture data from images:
+  #
+  # 1. Convert image data to raw ASCII character map.
+  #   @see http://www.text-image.com/convert/ascii.html
+  #   Image width:  64
+  #   Text color:   BLACK
+  #   Background:   WHITE
+  #   Invert image: Yes
+  #
+  # 2. Extract color map data from image.
+  #   @see https://github.com/tzvetkoff/im2a
+  #   im2a --height=32 --width=64 <file.png> > out.txt
+  #
+  # 3. Clean up output from (2) to match format given in self.temp_colors method
+  #    header and add parsed array data to GameData.temp_colors method.
+  #
+  # 4. Run Texture.encode_colors against the new GameData.temp_colors method.
+  #
+  # 5. Use the raw ASCII character data from step (1) and encoded color data from
+  #    step (4) to make a new texture entry for this method's returned Hash object.
   #
   def self.textures
     {
@@ -479,6 +504,40 @@ class GameData
         [ "o////::-::::::::::::::::::::::::::::::::::::::::::::://///+/::/-", "3ocgv81jdqmxz6jbp7zc4hl9zh79jdoh83s5cp7t1ms7yqvv47y5kc7iszywdqiropcdhoh9p403ywmzrg1b7bcii6jnuuxerz9"  ],
         [ "+///:::////////////////////////////////////////////////////////:", "121r7thns7lwbhoes37r58ej4m8e0qwqdwrv3g6cxer0cdyycuk1lpvtwp82nv8a1d6x6njt36qnl4s7fnci2aenoum9bpxslcg2" ]
       ],
+      'F' => [
+        [ ".s++oshddhhhhyyoo++++shhssoosyy/-ysyyyysooooosso++++ossyyyyysoo-", "9azovusin28ws51hosc1cunrwtc27nyu7sawjiwrbi9xmcazksijab4nvq69px7mcvw2m4onltl448k4qn5qxpwtuhq4nmynjsd" ],
+        [ ".sossyhhysso+//:::::oyhyo++ooso:.s/+so+/:::/+++/:::/+oossso+++o/", "f6td880nj3gfvtx0pr8girjsiatv0rcg9rmub0wii8179rbdrkfwz6q1g8f4ac2vcz7v6d7wryaawg0lnx2j8f3jcgsaj6lw830" ],
+        [ "-dhysso++///:::////syhyssssoo+/..s/++/:::/++++++/:/+ssssoooosyy+", "kxuwq3skx0ypu3p9ryuwjdnqa1i0s0v1xlb63yi66835pn462giphs4h79di1pnde9f0lbs9upxawu6l64e6negg0zdc1y963i2" ],
+        [ "-dso++///:::://++oyyyyysss+/::-..s+++///osso++++//++ssssosyyyso-", "9azsykwn2ezws4p8ci5y4d0s9nx3db9kq8nm6y8nk4k4o3fk7l1vyfe9a4wocvzgw63d5v7y5kgrshzrnhs7bgalr962nsvbwai" ],
+        [ "-y+/////::::/+ssyyhysoooo+:---:..s+ssooo+++////////+ooosyydyo+/-", "9a6ot4hk2uf52srx7egupmxh2zgz1uy1a3ffquhe2gbl8ry8gvjnd2rm8fwdupdf1nu00vcljadt4wtc1xp7b7exq3tf59gm69m" ],
+        [ ".s/:::::://+ssyhdhyo++//:-----:..yooo+//::////////+ooosssyyo++/-", "9a6ot0yud2f991ljegh93kbe3atuwicak0o11ww8u10w54el66b318no8ftg05z6ug14u248ffa7ucs49lofhje6pgeu0sfgl4d" ],
+        [ ".s:::://+osyyyhhyo+//::-..--:/+:.y+/////++oo+//:/+ssssss+sso+++-", "9azo6qabyf8aggrfcn153zcthrj1nxovwm7499x96tbq5shky2do8rphl63hs1j94pnip3huxjzbhy0z9rht7n2obpf0w4ujtgs" ],
+        [ ".s:/+osyyhyyyhyo//::::-..-:/+ss/.s////+sso+////+ssssyssosys++++:", "f139mryytki7ke2i5x72pmtketgwbjfzxm4dg01iq1joh5zgg0inx3i0xeovxad9vuz29ouizwuev9opla19b21qcifalrv44bw" ],
+        [ ".y+oosyysooshys//:::--.-::/oss+-.s//+ssso+//+oyyyssyso++ss+++++-", "9azo6q9u2jthxr3g7lwy9vuueucesi8b5pcn9v5unpq2meuv6zhfgkwpla2drcmvpoixpgjm87r4bqd64vlgfvawc9ob0bc3a3x" ],
+        [ ".hsoosso//shys+/::--..-:+oso+/:..s+ssssooossyysso+////oo+++so//.", "11qygd3alpaszb1u1tp21iqzq5du5j94u7nagk6v92bhp7xd3yekrdfblddxmmhvt4wklojgp9ujedh04hf5n1o5aure24tr3izx" ],
+        [ "-dyyyysssyhyo/::-----:/+so+/::/-.yssooosssssso//:::/++///+o+/::.", "11qxn927w1m7wffyhgolfuc4q59e2bculr38lmsi6ndd5k5gm8u1woomys3fnvvna2a5in47gmv5aznnwmq6porj0gub3m922dkq" ],
+        [ "-hyhdhs++ss+/:::---::/+oo/:://o:-y++syyssosso/:/+oss/:://++:--:-", "9a5niydgfyoa7q38m92eoxwwhea86hywp64kcb4ztmb2548q4h2zq6vjbl1ox2qqjjwe1gc3kfbssx1dxu8hzf2zw2vm7z33n7e" ],
+        [ "-dhs+::/oso/:::::::/+++/////+oo:.s+syysooossooooo+/::::/++/--/+/", "f6t94bwelt38e5ddtjff5x7hq06yex7iucx3l3i6spo2syql1kxw1pp41jeepaw2redcgoedr0e9matfb0yrlbttz6686sgzrqy" ],
+        [ ":d+:-::+ss+/:::::/oso++++ooso+/-.ysyso+osyysso+/::::::/+o+//+ss:", "f213l7s4qtcwonpp1xqrzjsmqtajkhq78b0sn3vsmjb6oxxz8od1hjd19aqqtozvksyunwzyxcqdwsu8yt9ujg2tk0xoxa1avku" ],
+        [ ".s:://+sso/:://ooso+/+oooosso//-.hyyyssooo+/:::::://///+syssss+.", "11rroldcjbbmz04sr3o2hjoy7dt1a27ka4oyx87w37h2rwbhh3q1dk1b70shiwx6snpvrvl699mt92a2zc3zuc1rqc0jj9go5nfx" ],
+        [ "./::///o+:::/+ooo+/:-::::/+//::--yso+/:://::----:://///+ooooo+:.", "11qxrgfox8dqugnuu766tjcsl8l026h44qns4ef2yggbben3byb4eg3sl7arplj2w9vb7iqcrbbolvnt6u9dne1p1rta2diyzbos" ],
+        [ ".+++//+oo+++++++//////////+++oo:.oo///++//////++//////++++oo+//.", "11l8crn8wnh45e4fnsy0p27ek1tqoyfhljj5eteg4ls3ccfr2bomk3lleeq6pksifhv1jxmt5zlgqzqjwqe4dmyxns56age5njl8" ],
+        [ ".yoo++syyoo++++//::::/+ossyssys/-ds++oo/::/+oo+/:-:/+ssooosso//-", "9a6kqaxmdzzybq920wd19d564hwkqdnx128xxzlwl920wbbbs4ilz75vbxwfxcocljvxbogkpsgjgvoc1iitn426c49hbkdnj71" ],
+        [ ".y++ossso++++//::///+oo+oyyysss/-dysso//:/ooo/:::/osysoo+ossso+-", "9azo7efthqjsbbga1pu7rabxxz5ybbut8one23zd46s8mhfd6q0ljxgso2tbz5d4rtsk70wtx16h0af8vnx2x7q45iobg3mpiwd" ],
+        [ ".s:/o+//++++/+oosyso++osyyyssss/-ds+////++//::/+ossyssooossso++-", "9azo6tt174cnjsmghbexlr9z036qjiurripx9joxvm6gq2p16eyjcymx5i971ahaakw7c38a5lhkc1enlzjeer6mwp9dy0y13hp" ],
+        [ ".s:+o+///+ossyssso+//osyysoooso:-do///+//::://+ssssssso++osso++:", "f139ms2condrf7vepefurp9am8bdslx6olb1h2gfl03iy1feew18n65anyc970wfhnjy31m4qjzujb8p0t2k9r3lpu7xciat3os" ],
+        [ ".s+so+//osyhsssoo+///+syyssssso:-dsooo/://///+osyssoo+///oso+/+/", "f6t95hx0x3k1ku0bxotvr9s66ikr68523vno9b1lx6qbtvux2n101qx4i2uwy8xiuefm8utfnnoqdc832dphb233uc1fpyh9hik" ],
+        [ ".ysso+osysso+++///+oo+oyyysssyy+:h+/:::/+++//+osso+//::/+so+/+s+", "kx1sjzavyo288bw3u77e4h18xkw2mcwv36cn6qs8vxvnw273k2qsfa3w796t8snhx1zz3a8gx92ac5aqv0bsd62fxsbsuanxm99" ],
+        [ "-dsyyhyso++/////++ssosyyyyssyys:.s-..-/+++///+sss++///+oso++oss:", "f217o1eytk1xsp24auz2n63b4ip76zuue4b3mbr1iapzdjpegu9wiwc6f0p0q2mgbl67yojjjpz84bpq4u6auvwt2za3exijbju" ],
+        [ "-dyyhhso+///+oosssoosssssooso/:..s---://////+syyso++++ossosso+/-", "9a6ot4hj6y92tab37ht4zm37av6ub19ayxur5qvu2lzszprre8rvauar7staprggbwzeu8ufqi30cl3wswkjmm385qptdig32gq" ],
+        [ "-dsosssso+++++ossssyyyssyso+/++:.s:::::::/+sssyyso+++oyhdys+::/-", "9a6klmwohq4oq5ut7ta2vrq3byrlrx4fd2zfpoj5jds7czfitoooml94p9wextxxb8vbxa0io51a4z9p91w0b83p203ob2wujp6" ],
+        [ "-hoosso+++++++syyyhhyo+////osso:.s::::::/+sssssoo++osssyyo+:://.", "11qygchzpfmo3lknqls6yc12xjloj4up1tndr781icypx6djr2zpmgvelvu1zflzp868rdq329ms3rpi5zl7gcghwdh7qsptlid6" ],
+        [ ".y++ooo++oossyyyyyo+:///++osso+-.s:::/++osssssooooss+//++os+//:.", "11qxnd4y061n0kytu428bojr11w5m1oguxnafmbb4c4o9fuy50piki1hlmfbbead9t8tg1ubna278k3pxsz95umghfm9ds5reqr1" ],
+        [ ".s++sysssyyyssyyo+///+oooosss+/..s:/+syyyyssssssss+/://+++oo+::.", "11qxn9mv65q44f24hutgwhqf3vcfsasvyz2z09z3wlvw72nlqnyvhkzya0c15axsj7tmnb8tpo0pjmhbgs90elcvtoe8pfwpbm5p" ],
+        [ ".sosyssssss++osossoosso+++ooo//..s/+syhhyysssoso/:::/++++/+o+::-", "9a5rmuesfmvlg4eryryecp9joux0hv4dzbdhfvaf4jsr1c883urvftpzy8p3nwpfznxbnbkuxdiaenpehl29p7tx8rf5c6cculo" ],
+        [ ".ysssssyso/:+ysssssoo+///++++/:.`s+syhyysossyy+::://+++///ossoo/", "f6y74loul4373tvhiare5tewph7zn8zzejs8yk3hjimhnt7f49umzexk9sch7kl1jn1wkqu99lbxn25yz3um4sf90f733rxugvh" ],
+        [ "-soo+ooo+:-/oo+++//::::::+++/:/-.o+ooo+////oo/:--:://::://+ooo+:", "f139mryycb2tfyisjv56qgk9clmew7cdb2co1w5928m5lv956bti9xqt6ipsrp1n2znon39vyekmhlk87shawqngvtpg51t7pdm" ]
+      ],
       'D' => [
         [ ".--------------------------------------------------------------.", "11pc9ei9rjbknpv5lnpg4wmzymdsysr8tu0i8a8betgn5p4bqp9ukaomrq223mmo2d1qfhhip0ms9i8xev5iaqgrfswlxzgn6xv1" ],
         [ ".ooo+:-++++++:-+o++++:-++++++:-+++oo+:-+ooo++:-++++++:-+++//+/:.", "11oylhof5275barq5b4lqrflc59nl8ymyi4u75mss0vnwtjjwxpab4yefhzqrflvlpys65n52gwzbhi5dgh8za5slrr8recwdn1p" ],
@@ -587,14 +646,6 @@ module GameHelpers
   #
   def clip_value( test_value, min_value, max_value )
     [ [ test_value, min_value ].max, max_value ].min
-  end
-
-  # Custom puts output method to handle unique console configuration.
-  #
-  # @param string [String] The text value to be output to the console
-  #
-  def puts( string = "" )
-    STDOUT.write "#{ string }\r\n"
   end
 
   # Helper function to convert degrees to radians.
@@ -945,6 +996,125 @@ class Pushwall < Cell
   end
 end
 
+# Contains the pixels for our screen buffer.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+class Buffer
+  attr_reader :height
+  attr_reader :pixels
+  attr_reader :screen
+  attr_reader :width
+
+  def initialize( args = {} )
+    @height = args[ :height ]
+    @screen = args[ :screen ]
+    @width  = args[ :width ]
+    @pixels = Array.new( @height ) { Array.new( @width ) }
+  end
+
+  # Clears the buffer.
+  #
+  def clear
+    @pixels.map! do |row|
+      row.map! do |char|
+        " "
+      end
+    end
+  end
+
+  # Draws the buffer to the screen.
+  #
+  def draw
+    @screen.output_line @pixels.map { |b| b.join }.join( "\r\n" )
+  end
+end
+
+# Defines the active game screen area.
+#
+# @author Adam Parrott <parrott.adam@gmail.com>
+#
+class Screen
+  WIPE_BLINDS       = 1
+  WIPE_PIXELIZE_IN  = 2
+  WIPE_PIXELIZE_OUT = 3
+
+  attr_reader   :buffer
+  attr_accessor :color_mode
+  attr_reader   :height
+  attr_reader   :width
+
+  def initialize( args = {} )
+    @height = args[ :height ]
+    @width  = args[ :width ]
+    @buffer = Buffer.new( height: @height, screen: self, width: @width )
+  end
+
+  # Clears the current screen.
+  #
+  def clear( full = false )
+    output_line "\e[2J" if full
+    output_line "\e[0;0H"
+  end
+
+  # Custom output method to handle unique console configuration.
+  #
+  # @param string [String] The text value to be output to the console
+  #
+  def output_line( string = "" )
+    STDOUT.write "#{ string }\r\n"
+  end
+
+  # Applies the selected screen wipe/transition to the active buffer.
+  #
+  # @param type [Integer] Desired wipe mode to use (WIPE_X)
+  #
+  def wipe( type )
+    case type
+    when WIPE_BLINDS
+      for j in 5.downto( 1 )
+        for y in ( 0...@buffer.pixels.size ).step( j )
+          for x in 0...@buffer.pixels[ y ].size
+            @buffer.pixels[ y ][ x ] = ""
+          end
+        end
+
+        clear true
+        @buffer.draw
+        sleep 0.25
+      end
+
+    when WIPE_PIXELIZE_IN
+      ( 0..( @height - 1 ) * @width ).to_a.shuffle.each_with_index do |i, j|
+        @buffer.pixels[ i / @width ][ i % @width ] = Color.colorize( " ", Color::WHITE, @color_mode )
+
+        if j % ( 4 ** @color_mode ) == 0
+          clear
+          @buffer.draw
+        end
+      end
+
+    when WIPE_PIXELIZE_OUT
+      @backup_buffer = Marshal.load( Marshal.dump( @buffer.pixels ) )
+
+      @buffer.pixels.map! do |row|
+        row.map! do |item|
+          Color.colorize( " ", Color::WHITE, @color_mode )
+        end
+      end
+
+      ( 0..( @height - 1 ) * @width ).to_a.shuffle.each_with_index do |i, j|
+        @buffer.pixels[ i / @width ][ i % @width ] = @backup_buffer[ i / @width ][ i % @width ]
+
+        if j % ( 4 ** @color_mode ) == 0
+          clear
+          @buffer.draw
+        end
+      end
+    end
+  end
+end
+
 # Defines a single wall texture.
 #
 # @author Adam Parrott <parrott.adam@gmail.com>
@@ -1060,10 +1230,6 @@ class Game
   include GameHelpers
   include Math
 
-  WIPE_BLINDS       = 1
-  WIPE_PIXELIZE_IN  = 2
-  WIPE_PIXELIZE_OUT = 3
-
   def initialize
     setup_variables
     setup_tables
@@ -1088,6 +1254,8 @@ class Game
       update_pushwalls
       update_frame_rate
       update_delta_time
+      display_messages
+
       draw_debug_info if @show_debug_info
 
       # TODO: Dynamically update this based on frame rate.
@@ -1683,8 +1851,17 @@ class Game
           end
         end
 
-      when "1", "2", "3"
-        @color_mode = key.to_i
+      when "1"
+        update_message "Color mode disabled."
+        @screen.color_mode = key.to_i
+
+      when "2"
+        update_message "Partial color mode enabled."
+        @screen.color_mode = key.to_i
+
+      when "3"
+        update_message "Full color mode enabled."
+        @screen.color_mode = key.to_i
 
       when "a"
         # Player is attempting to strafe left
@@ -1702,9 +1879,11 @@ class Game
         if @draw_ceiling
           @ceiling_color = @default_ceiling_color
           @ceiling_texture = @default_ceiling_texture
+          update_message "Ceiling drawing enabled."
         else
           @ceiling_color = Color::BLACK
           @ceiling_texture = " "
+          update_message "Ceiling drawing disabled."
         end
 
       when "?"
@@ -1716,9 +1895,11 @@ class Game
         if @draw_floor
           @floor_color = @default_floor_color
           @floor_texture = @default_floor_texture
+          update_message "Floor drawing enabled."
         else
           @floor_color = Color::BLACK
           @floor_texture = " "
+          update_message "Floor drawing disabled."
         end
 
       when "h"
@@ -1726,14 +1907,14 @@ class Game
 
       when "i"
         @show_debug_info = !@show_debug_info
-        clear_screen true
+        clear_screen
 
       when "m"
-        draw_screen_wipe WIPE_PIXELIZE_IN
+        @screen.wipe Screen::WIPE_PIXELIZE_IN
         @player_x = @magic_x unless @magic_x.nil?
         @player_y = @magic_y unless @magic_y.nil?
         update_buffer
-        draw_screen_wipe WIPE_PIXELIZE_OUT
+        @screen.wipe Screen::WIPE_PIXELIZE_OUT
         update_buffer
 
       when "p"
@@ -1749,30 +1930,43 @@ class Game
       when "t"
         @draw_textures = !@draw_textures
 
+        if @draw_textures
+          update_message "Wall textures enabled."
+        else
+          update_message "Wall textures disabled."
+        end
+
       end
   end
 
   # Clears the current screen buffer.
   #
   def clear_buffer
-    @buffer.map! do |row|
-      row.map! do |char|
-        ""
-      end
-    end
+    @screen.buffer.clear
   end
 
   # Clears the current screen.
   #
-  def clear_screen( full = false )
-    puts "\e[2J" if full
-    puts "\e[0;0H"
+  def clear_screen( full = true )
+    @screen.clear full
+  end
+
+  def display_messages
+    return if @message_timer.nil?
+
+    if ( Time.now - @message_timer > 3 ) || @display_message.empty?
+      @display_message = "".ljust( 40 )
+      @message_timer = nil
+    end
+
+    position_cursor 1, 2
+    @screen.output_line @display_message
   end
 
   # Draws the current buffer to the screen.
   #
   def draw_buffer
-    puts @buffer.map { |b| b.join }.join( "\r\n" )
+    @screen.buffer.draw
   end
 
   # Draws extra information onto HUD.
@@ -1782,55 +1976,6 @@ class Game
     STDOUT.write "\e[1;#{ @screen_width - @debug_string.size }H #{ @debug_string }"
   end
 
-  # Applies the selected screen wipe/transition to the active buffer.
-  #
-  # @param type [Integer] Desired wipe mode to use (WIPE_X)
-  #
-  def draw_screen_wipe( type )
-    case type
-    when WIPE_BLINDS
-      for j in 5.downto( 1 )
-        for y in ( 0...@buffer.size ).step( j )
-          for x in 0...@buffer[ y ].size
-            @buffer[ y ][ x ] = ""
-          end
-        end
-
-        clear_screen true
-        draw_buffer
-        sleep 0.25
-      end
-
-    when WIPE_PIXELIZE_IN
-      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
-        @buffer[ i / @screen_width ][ i % @screen_width ] = Color.colorize( " ", Color::WHITE, @color_mode )
-
-        if j % ( 4 ** @color_mode ) == 0
-          clear_screen
-          draw_buffer
-        end
-      end
-
-    when WIPE_PIXELIZE_OUT
-      @backup_buffer = Marshal.load( Marshal.dump( @buffer ) )
-
-      @buffer.map! do |row|
-        row.map! do |item|
-          Color.colorize( " ", Color::WHITE, @color_mode )
-        end
-      end
-
-      ( 0..( @screen_height - 1 ) * @screen_width ).to_a.shuffle.each_with_index do |i, j|
-        @buffer[ i / @screen_width ][ i % @screen_width ] = @backup_buffer[ i / @screen_width ][ i % @screen_width ]
-
-        if j % ( 4 ** @color_mode ) == 0
-          clear_screen
-          draw_buffer
-        end
-      end
-    end
-  end
-
   # Displays the current status line on the screen.
   #
   def draw_status_line
@@ -1838,11 +1983,11 @@ class Game
     @status_y = @player_y.to_s.rjust( 3 )
     @status_angle = ( ( @player_angle / @fixed_step ).round ).to_s.rjust( 3 )
 
-    @status_left = "(Press H for help)".ljust( 18 )
+    @status_left = "(Press H for help)".rjust( 19 )
     @status_middle = @hud_messages[ @play_count % 3 ].center( 44 )
-    @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 18 )
+    @status_right = "#{ @status_x } x #{ @status_y } / #{ @status_angle }".ljust( 17 )
 
-    puts @status_left + @status_middle + @status_right
+    @screen.output_line @status_left + @status_middle + @status_right
   end
 
   # Positions the cursor to the specified row and column.
@@ -1902,7 +2047,7 @@ class Game
     end
   end
 
-  # Fills the buffer with the results of our ray casting data.
+  # Fills the buffer with all objects and structures to be drawn to the screen.
   #
   def populate_buffer
     @cast.each_with_index do |ray, index|
@@ -1911,7 +2056,8 @@ class Game
       @wall_type = ray[ :map_type ]
       @wall_height = ray[ :scale ].to_i >> 1 << 1
       @wall_trim = [ ( @wall_height - @screen_height ) / 2, 0 ].max
-      @wall_padding = [ ( @screen_height - @wall_height ) / 2, 0 ].max
+      @wall_bottom = [ @screen_half_height + ( @wall_height / 2 ), @screen_height ].min
+      @wall_top = [ @screen_half_height - ( @wall_height / 2 ), 0 ].max
       @wall_texture = ray[ :texture_id ]
 
       if @draw_textures
@@ -1925,31 +2071,72 @@ class Game
           next unless i.between? @wall_trim, @wall_height - @wall_trim
 
           @texel_y = clip_value( ( i * @texel_factor ).to_i , 0, @texture.height - 1 )
-
-          case @color_mode
-          when Color::MODE_NONE
-            @texel = @texture.pixels[ @texel_y ][ @texel_x ]
-          when Color::MODE_PARTIAL
-            @texel = "\e[38;5;#{ @texture.colors[ @texel_y ][ @texel_x ] }m#{ @texture.pixels[ @texel_y ][ @texel_x ] }\e[0;0m"
-          when Color::MODE_FILL
-            @texel = "\e[1;38;5;#{ @texture.colors[ @texel_y ][ @texel_x ] }m%\e[0;0m"
-          end
+          @texel = Color.texturize(
+            @texture.pixels[ @texel_y ][ @texel_x ],
+            @texture.colors[ @texel_y ][ @texel_x ],
+            @screen.color_mode
+          )
 
           @wall_pixels += "#{ @texel },"
         end
       else
-        @wall_color = @wall_colors[ @wall_texture ][ ray[ :dark_wall ] ? 0 : 1 ]
-        @wall_texel = Color.colorize( @wall_type, @wall_color, @color_mode )
+        @wall_color  = @wall_colors[ @wall_texture ][ ray[ :dark_wall ] ? 0 : 1 ]
+        @wall_texel  = Color.colorize( @wall_type, @wall_color, @screen.color_mode )
         @wall_pixels = "#{ @wall_texel }," * clip_value( @wall_height, 0, @screen_height )
       end
 
-      @ceiling_pixels = "#{ Color.colorize( @ceiling_texture, @ceiling_color, @color_mode ) }," * @wall_padding
-      @floor_pixels = "#{ Color.colorize( @floor_texture, @floor_color, @color_mode ) }," * @wall_padding
-      @sliver = "#{ @ceiling_pixels }#{ @wall_pixels }#{ @floor_pixels }".split( "," )
+      @wall_pixels = @wall_pixels.split( "," )
 
-      for y in 0...@screen_height
-        @buffer[ y ][ index ] = @sliver[ y ]
+      for y in @wall_top...@wall_bottom
+        @screen.buffer.pixels[ y ][ index ] = @wall_pixels[ y - @wall_top ]
       end
+    end
+
+    angle = ( @player_angle - @angles[ @half_fov ] + @angles[ 360 ] ) % @angles[ 360 ]
+
+    for col in 1...@screen_width
+      for row in 1...@screen_half_height
+        skip_ceiling = @screen.buffer.pixels[ @screen_half_height - row ][ col ] != " "
+        skip_floor   = @screen.buffer.pixels[ @screen_half_height + row ][ col ] != " "
+
+        next if skip_ceiling && skip_floor
+
+        dist = @span_table[ col ][ row ]
+        x    = ( @player_x + ( @cos_table[ angle ] * dist ) ).to_i
+        y    = ( @player_y + ( @sin_table[ angle ] * dist ) ).to_i
+
+        next if ( x < 0 || x >= @map_x_size )
+        next if ( y < 0 || y >= @map_y_size )
+
+        @texel_x = x % Cell::WIDTH
+        @texel_y = ( y % Cell::HEIGHT ) >> 1
+
+        if ( @draw_ceiling && !skip_ceiling )
+          if @draw_textures
+            @screen.buffer.pixels[ @screen_half_height - row ][ col ] = Color.texturize(
+              @textures[ 'E' ].pixels[ @texel_y ][ @texel_x ],
+              @textures[ 'E' ].colors[ @texel_y ][ @texel_x ],
+              @screen.color_mode
+            )
+          else
+            @screen.buffer.pixels[ @screen_half_height - row ][ col ] = Color.colorize( @ceiling_texture, @ceiling_color, @screen.color_mode )
+          end
+        end
+
+        if ( @draw_floor && !skip_floor )
+          if @draw_textures
+            @screen.buffer.pixels[ @screen_half_height + row ][ col ] = Color.texturize(
+              @textures[ 'F' ].pixels[ @texel_y ][ @texel_x ],
+              @textures[ 'F' ].colors[ @texel_y ][ @texel_x ],
+              @screen.color_mode
+            )
+          else
+            @screen.buffer.pixels[ @screen_half_height + row ][ col ] = Color.colorize( @floor_texture, @floor_color, @screen.color_mode )
+          end
+        end
+      end
+
+      angle = 0 if ( ( angle += 1 ) > @angles[ 360 ] )
     end
   end
 
@@ -2169,6 +2356,7 @@ class Game
     @inv_tan_table  = []
     @movewalls      = []
     @pushwalls      = []
+    @span_table     = []
     @x_step         = []
     @y_step         = []
     @wall_colors    = {}
@@ -2208,6 +2396,23 @@ class Game
       @fish_eye_table[ angle + @angles[ @half_fov ] ] = 1.0 / cos( rad_angle )
     end
 
+    # Configure our floor/ceiling lookup table.
+    #
+    # NOTE: The span_scale may need to be dynamically adjusted
+    # once we start allowing the user to select different
+    # screen width/height combinations.
+    #
+    @span_scale = 27
+    @scale_height = ( @screen_height * @span_scale ).to_i
+
+    for col in 1...@screen_width
+      @span_table[ col ] = []
+
+      for row in 1...@screen_half_height
+        @span_table[ col ][ row ] = ( @fish_eye_table[ col ] * ( @scale_height / row ).to_i )
+      end
+    end
+
     # Configure our textures and wall color tables.
     #
     @textures = GameData.textures.update( GameData.textures ) do |key, value|
@@ -2243,6 +2448,7 @@ class Game
     #
     @player_angle = 0
     @player_fov = 60
+    @half_fov = @player_fov / 2
     @player_move_x = 0
     @player_move_y = 0
     @player_starting_angle = 90
@@ -2253,11 +2459,11 @@ class Game
 
     # Define our screen dimensions and field-of-view metrics.
     #
-    @half_fov = @player_fov / 2
     @screen_width = 80
     @screen_height = 36
-
-    @buffer = Array.new( @screen_height ) { Array.new( @screen_width ) }
+    @screen_half_height = @screen_height / 2
+    @screen = Screen.new( height: @screen_height, width: @screen_width )
+    @screen.color_mode = Color::MODE_PARTIAL
 
     @fixed_factor = 512
     @fixed_angles = ( 360 * @screen_width ) / @player_fov
@@ -2283,14 +2489,13 @@ class Game
 
     @draw_ceiling = true
     @draw_floor = true
-    @draw_walls = true
-    @draw_textures = true
+    @draw_textures = false
 
     # Define miscellaneous game variables.
     #
-    @color_mode = Color::MODE_NONE
     @delta_start_time = 0.0
     @delta_time = 0.0
+    @display_message = ""
     @show_debug_info = false
     @play_count = 0
   end
@@ -2299,70 +2504,70 @@ class Game
   # press a key before returning control back to the caller.
   #
   def show_debug_screen
-    clear_screen true
+    clear_screen
 
-    puts
-    puts "Super Awesome Debug Console(TM)".center( @screen_width )
-    puts
-    puts "[ Flags ]".center( @screen_width )
-    puts
-    puts ( "Color mode".ljust( 25 )          + @color_mode.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "Draw ceiling?".ljust( 25 )       + @draw_ceiling.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "Draw floor?".ljust( 25 )         + @draw_floor.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "Display extra info?".ljust( 25 ) + @show_debug_info.to_s.rjust( 25 ) ).center( @screen_width )
-    puts
-    puts "[ Metrics ]".center( @screen_width )
-    puts
-    puts ( "active_doors".ljust( 25 )        + @doors.size.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "active_movewalls".ljust( 25 )    + @movewalls.size.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "active_pushwalls".ljust( 25 )    + @pushwalls.size.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "cell_height".ljust( 25 )         + Cell::HEIGHT.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "cell_width".ljust( 25 )          + Cell::WIDTH.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "frames_rendered".ljust( 25 )     + @frames_rendered.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "frame_rate".ljust( 25 )          + @frame_rate.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "frame_total_time".ljust( 25 )    + ( Time.now - @frame_start_time ).round( 4 ).to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "play_count".ljust( 25 )          + @play_count.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_angle".ljust( 25 )        + ( @player_angle / @fixed_step ).round( 2 ).to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_angle_raw".ljust( 25 )    + @player_angle.round( 2 ).to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_fov".ljust( 25 )          + @player_fov.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_x".ljust( 25 )            + @player_x.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "player_y".ljust( 25 )            + @player_y.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "map_columns".ljust( 25 )         + @map_columns.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "map_rows".ljust( 25 )            + @map_rows.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "map_x_size".ljust( 25 )          + @map_x_size.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "map_y_size".ljust( 25 )          + @map_y_size.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "screen_width".ljust( 25 )        + @screen_width.to_s.rjust( 25 ) ).center( @screen_width )
-    puts ( "screen_height".ljust( 25 )       + @screen_height.to_s.rjust( 25 ) ).center( @screen_width )
-    puts
-    puts "Press any key to continue...".center( @screen_width )
-    puts
+    @screen.output_line
+    @screen.output_line "Super Awesome Debug Console(TM)".center( @screen_width )
+    @screen.output_line
+    @screen.output_line "[ Flags ]".center( @screen_width )
+    @screen.output_line
+    @screen.output_line ( "Color mode".ljust( 25 )          + @screen.color_mode.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Draw ceiling?".ljust( 25 )       + @draw_ceiling.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Draw floor?".ljust( 25 )         + @draw_floor.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Draw textures?".ljust( 25 )      + @draw_textures.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line
+    @screen.output_line "[ Metrics ]".center( @screen_width )
+    @screen.output_line
+    @screen.output_line ( "active_doors".ljust( 25 )        + @doors.size.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "active_movewalls".ljust( 25 )    + @movewalls.size.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "active_pushwalls".ljust( 25 )    + @pushwalls.size.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "cell_height".ljust( 25 )         + Cell::HEIGHT.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "cell_width".ljust( 25 )          + Cell::WIDTH.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "frames_rendered".ljust( 25 )     + @frames_rendered.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "frame_rate".ljust( 25 )          + @frame_rate.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "frame_total_time".ljust( 25 )    + ( Time.now - @frame_start_time ).round( 4 ).to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "play_count".ljust( 25 )          + @play_count.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "player_angle".ljust( 25 )        + ( @player_angle / @fixed_step ).round( 2 ).to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "player_angle_raw".ljust( 25 )    + @player_angle.round( 2 ).to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "player_fov".ljust( 25 )          + @player_fov.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "player_x".ljust( 25 )            + @player_x.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "player_y".ljust( 25 )            + @player_y.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "map_columns".ljust( 25 )         + @map_columns.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "map_rows".ljust( 25 )            + @map_rows.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "map_x_size".ljust( 25 )          + @map_x_size.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "map_y_size".ljust( 25 )          + @map_y_size.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "screen_width".ljust( 25 )        + @screen_width.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "screen_height".ljust( 25 )       + @screen_height.to_s.rjust( 25 ) ).center( @screen_width )
+    @screen.output_line
+    @screen.output_line "Press any key to continue...".center( @screen_width )
+    @screen.output_line
 
     Input.wait_key
-    clear_screen true
+    clear_screen
     update_buffer
   end
 
   # Shows the ending screen.
   #
   def show_end_screen
-    draw_screen_wipe WIPE_BLINDS
-    clear_screen true
+    @screen.wipe Screen::WIPE_BLINDS
+    clear_screen
 
     position_cursor ( @screen_height / 2 ) - 7, 0
 
-    puts "You have reached...".center( 72 )
-    puts "                ,,                                                  ,,  "
-    puts " MMP''MM''YMM `7MM                    `7MM'''YMM                  `7MM  "
-    puts " P'   MM   `7   MM                      MM    `7                    MM  "
-    puts "      MM        MMpMMMb.  .gP'Ya        MM   d    `7MMpMMMb.   ,M''bMM  "
-    puts "      MM        MM    MM ,M'   Yb       MMmmMM      MM    MM ,AP    MM  "
-    puts "      MM        MM    MM 8M''''''       MM   Y  ,   MM    MM 8MI    MM  "
-    puts "      MM        MM    MM YM.    ,       MM     ,M   MM    MM `Mb    MM  "
-    puts "    .JMML.    .JMML  JMML.`Mbmmd'     .JMMmmmmMMM .JMML  JMML.`Wbmd'MML."
-    puts
-    puts "...or have you?".center( 72 )
-    puts
-    puts "Press any key to find out!".center( 72 )
+    @screen.output_line "You have reached...".center( 72 )
+    @screen.output_line "                ,,                                                  ,,  "
+    @screen.output_line " MMP''MM''YMM `7MM                    `7MM'''YMM                  `7MM  "
+    @screen.output_line " P'   MM   `7   MM                      MM    `7                    MM  "
+    @screen.output_line "      MM        MMpMMMb.  .gP'Ya        MM   d    `7MMpMMMb.   ,M''bMM  "
+    @screen.output_line "      MM        MM    MM ,M'   Yb       MMmmMM      MM    MM ,AP    MM  "
+    @screen.output_line "      MM        MM    MM 8M''''''       MM   Y  ,   MM    MM 8MI    MM  "
+    @screen.output_line "      MM        MM    MM YM.    ,       MM     ,M   MM    MM `Mb    MM  "
+    @screen.output_line "    .JMML.    .JMML  JMML.`Mbmmd'     .JMMmmmmMMM .JMML  JMML.`Wbmd'MML."
+    @screen.output_line
+    @screen.output_line "...or have you?".center( 72 )
+    @screen.output_line
+    @screen.output_line "Press any key to find out!".center( 72 )
 
     Input.clear_input
     Input.wait_key
@@ -2372,24 +2577,24 @@ class Game
     initialize
     activate_movewalls
     reset_timers
-    clear_screen true
+    clear_screen
     update_buffer
   end
 
   # Displays the exit screen and quits the game.
   #
   def show_exit_screen
-    clear_screen true
+    clear_screen
 
-    puts
-    puts "Thanks for playing...".center( @screen_width )
-    puts
+    @screen.output_line
+    @screen.output_line "Thanks for playing...".center( @screen_width )
+    @screen.output_line
     show_logo
-    puts
-    puts
-    puts "Problems or suggestions? Visit the repo!".center( @screen_width )
-    puts "http://www.github.com/AtomicPair/wolfentext3d".center( @screen_width )
-    puts
+    @screen.output_line
+    @screen.output_line
+    @screen.output_line "Problems or suggestions? Visit the repo!".center( @screen_width )
+    @screen.output_line "http://www.github.com/AtomicPair/wolfentext3d".center( @screen_width )
+    @screen.output_line
 
     exit 0
   end
@@ -2398,68 +2603,68 @@ class Game
   # press a key before returning control back to the caller.
   #
   def show_help_screen
-    clear_screen true
+    clear_screen
 
-    puts
-    puts "Wolfentext3D Help".center( @screen_width )
-    puts
-    puts "[ Notes ]".center( @screen_width )
-    puts
-    puts "Testing has shown that running this game in color ".center( @screen_width )
-    puts "mode under some terminals will result in very poor".center( @screen_width )
-    puts "poor performance.  Thus, if you experience low    ".center( @screen_width )
-    puts "frame rates in your chosen terminal, try running  ".center( @screen_width )
-    puts "in 'no color' mode OR use a different terminal    ".center( @screen_width )
-    puts "altogether for the best possible experience. See  ".center( @screen_width )
-    puts "the README for a table of compatible terminals.   ".center( @screen_width )
-    puts
-    puts "Enjoy the game!                                   ".center( @screen_width )
-    puts
-    puts "[ Keys ]".center( @screen_width )
-    puts
-    puts ( "Move forward".ljust( 25 )   + "Up Arrow, w".rjust( 25 ) ).center( @screen_width )
-    puts ( "Move backward".ljust( 25 )  + "Down Arrow, s".rjust( 25 ) ).center( @screen_width )
-    puts ( "Strafe left".ljust( 25 )    + "a".rjust( 25 ) ).center( @screen_width )
-    puts ( "Strafe right".ljust( 25 )   + "d".rjust( 25 ) ).center( @screen_width )
-    puts ( "Turn left".ljust( 25 )      + "Left Arrow, k".rjust( 25 ) ).center( @screen_width )
-    puts ( "Turn right".ljust( 25 )     + "Right Arrow, l".rjust( 25 ) ).center( @screen_width )
-    puts
-    puts ( "Open doors/activate walls".ljust( 25 ) + "Space".rjust( 25 ) ).center( @screen_width )
-    puts
-    puts ( "Toggle ceiling".ljust( 25 )    + "c".rjust( 25 ) ).center( @screen_width )
-    puts ( "Toggle debug info".ljust( 25 ) + "i".rjust( 25 ) ).center( @screen_width )
-    puts ( "Toggle floor".ljust( 25 )      + "f".rjust( 25 ) ).center( @screen_width )
-    puts ( "Toggle texturing".ljust( 25 )  + "t".rjust( 25 ) ).center( @screen_width )
-    puts
-    puts Color.colorize( ( "No color".ljust( 25 )      + "1".rjust( 25 ) ).center( @screen_width ), Color::BLUE, 2 )
-    puts Color.colorize( ( "Partial color".ljust( 25 ) + "2".rjust( 25 ) ).center( @screen_width ), Color::GREEN, 2 )
-    puts Color.colorize( ( "Full color".ljust( 25 )    + "3".rjust( 25 ) ).center( @screen_width ), Color::YELLOW, 2 )
-    puts
-    puts ( "Debug screen".ljust( 25 )   + "?".rjust( 25 ) ).center( @screen_width )
-    puts ( "Help screen".ljust( 25 )    + "h".rjust( 25 ) ).center( @screen_width )
-    puts ( "Quit game".ljust( 25 )      + "q".rjust( 25 ) ).center( @screen_width )
-    puts
-    puts "Press any key to continue...".center( @screen_width )
-    puts
+    @screen.output_line
+    @screen.output_line "Wolfentext3D Help".center( @screen_width )
+    @screen.output_line
+    @screen.output_line "[ Notes ]".center( @screen_width )
+    @screen.output_line
+    @screen.output_line "Testing has shown that running this game in color ".center( @screen_width )
+    @screen.output_line "mode under some terminals will result in very poor".center( @screen_width )
+    @screen.output_line "poor performance.  Thus, if you experience low    ".center( @screen_width )
+    @screen.output_line "frame rates in your chosen terminal, try running  ".center( @screen_width )
+    @screen.output_line "in 'no color' mode OR use a different terminal    ".center( @screen_width )
+    @screen.output_line "altogether for the best possible experience. See  ".center( @screen_width )
+    @screen.output_line "the README for a table of compatible terminals.   ".center( @screen_width )
+    @screen.output_line
+    @screen.output_line "Enjoy the game!                                   ".center( @screen_width )
+    @screen.output_line
+    @screen.output_line "[ Keys ]".center( @screen_width )
+    @screen.output_line
+    @screen.output_line ( "Move forward".ljust( 25 )   + "Up Arrow, w".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Move backward".ljust( 25 )  + "Down Arrow, s".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Strafe left".ljust( 25 )    + "a".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Strafe right".ljust( 25 )   + "d".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Turn left".ljust( 25 )      + "Left Arrow, k".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Turn right".ljust( 25 )     + "Right Arrow, l".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line
+    @screen.output_line ( "Open doors/activate walls".ljust( 25 ) + "Space".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line
+    @screen.output_line ( "Toggle ceiling".ljust( 25 )    + "c".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Toggle debug info".ljust( 25 ) + "i".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Toggle floor".ljust( 25 )      + "f".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Toggle texturing".ljust( 25 )  + "t".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line
+    @screen.output_line Color.colorize( ( "No color".ljust( 25 )      + "1".rjust( 25 ) ).center( @screen_width ), Color::BLUE, 2 )
+    @screen.output_line Color.colorize( ( "Partial color".ljust( 25 ) + "2".rjust( 25 ) ).center( @screen_width ), Color::GREEN, 2 )
+    @screen.output_line Color.colorize( ( "Full color".ljust( 25 )    + "3".rjust( 25 ) ).center( @screen_width ), Color::YELLOW, 2 )
+    @screen.output_line
+    @screen.output_line ( "Debug screen".ljust( 25 )   + "?".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Help screen".ljust( 25 )    + "h".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line ( "Quit game".ljust( 25 )      + "q".rjust( 25 ) ).center( @screen_width )
+    @screen.output_line
+    @screen.output_line "Press any key to continue...".center( @screen_width )
+    @screen.output_line
 
     Input.wait_key
-    clear_screen true
+    clear_screen
     update_buffer
   end
 
   # Displays the game's title screen.
   #
   def show_title_screen
-    clear_screen true
+    clear_screen
 
-    puts
+    @screen.output_line
     show_logo
-    puts
-    puts
-    puts "Press any key to start...".center( 88 )
+    @screen.output_line
+    @screen.output_line
+    @screen.output_line "Press any key to start...".center( 88 )
 
     Input.wait_key
-    clear_screen true
+    clear_screen
   end
 
   # Displays the Wolfentext logo.
@@ -2468,32 +2673,32 @@ class Game
   # @see http://patorjk.com/software/taag/
   #
   def show_logo
-    puts "    .~`'888x.!**h.-``888h.               x .d88'     oec :                              "
-    puts "   dX   `8888   :X   48888>         u.    5888R     @88888                u.    u.      "
-    puts "  '888x  8888  X88.  '8888>   ...ue888b   '888R     8'*88%       .u     x@88k u@88c.    "
-    puts "  '88888 8888X:8888:   )?''`  888R Y888r   888R     8b.       ud8888.  ^'8888''8888'^   "
-    puts "   `8888>8888 '88888>.88h.    888R I888>   888R    u888888> :888'8888.   8888  888R     "
-    puts "     `8' 888f  `8888>X88888.  888R I888>   888R     8888R   d888 '88%'   8888  888R     "
-    puts "    -~` '8%'     88' `88888X  888R I888>   888R     8888P   8888.+'      8888  888R     "
-    puts "    .H888n.      XHn.  `*88! u8888cJ888    888R     *888>   8888L        8888  888R     "
-    puts "   :88888888x..x88888X.  `!   '*888*P'    .888B .   4888    '8888c. .+  '*88*' 8888'    "
-    puts "   f  ^%888888% `*88888nx'      'Y'       ^*888%    '888     '88888%      ''   'Y'      "
-    puts "        `'**'`    `'**''                    '%       88R       'YP'                     "
-    puts "                                                     88>                                "
-    puts "                                                     48                                 "
-    puts "                                                     '8                                 "
-    puts "    .....                                       s                          ....         "
-    puts " .H8888888h.  ~-.                              :8      .x~~'*Weu.      .xH888888Hx.     "
-    puts " 888888888888x  `>               uL   ..      .88     d8Nu.  9888c   .H8888888888888:   "
-    puts "X~     `?888888hx~      .u     .@88b  @88R   :888ooo  88888  98888   888*'''?''*88888X  "
-    puts "'      x8.^'*88*'    ud8888.  ''Y888k/'*P  -*8888888  '***'  9888%  'f     d8x.   ^%88k "
-    puts " `-:- X8888x       :888'8888.    Y888L       8888          ..@8*'   '>    <88888X   '?8 "
-    puts "      488888>      d888 '88%'     8888       8888       ````'8Weu    `:..:`888888>    8>"
-    puts "    .. `'88*       8888.+'        `888N      8888      ..    ?8888L         `'*88     X "
-    puts "  x88888nX'      . 8888L       .u./'888&    .8888Lu= :@88N   '8888N    .xHHhx..'      ! "
-    puts " !'*8888888n..  :  '8888c. .+ d888' Y888*'  ^%888*   *8888~  '8888F   X88888888hx. ..!  "
-    puts "'    '*88888888*    '88888%   ` 'Y   Y'       'Y'    '*8'`   9888%   !   '*888888888'   "
-    puts "        ^'***'`       'YP'                             `~===*%'`            ^'***'`     "
+    @screen.output_line "    .~`'888x.!**h.-``888h.               x .d88'     oec :                              "
+    @screen.output_line "   dX   `8888   :X   48888>         u.    5888R     @88888                u.    u.      "
+    @screen.output_line "  '888x  8888  X88.  '8888>   ...ue888b   '888R     8'*88%       .u     x@88k u@88c.    "
+    @screen.output_line "  '88888 8888X:8888:   )?''`  888R Y888r   888R     8b.       ud8888.  ^'8888''8888'^   "
+    @screen.output_line "   `8888>8888 '88888>.88h.    888R I888>   888R    u888888> :888'8888.   8888  888R     "
+    @screen.output_line "     `8' 888f  `8888>X88888.  888R I888>   888R     8888R   d888 '88%'   8888  888R     "
+    @screen.output_line "    -~` '8%'     88' `88888X  888R I888>   888R     8888P   8888.+'      8888  888R     "
+    @screen.output_line "    .H888n.      XHn.  `*88! u8888cJ888    888R     *888>   8888L        8888  888R     "
+    @screen.output_line "   :88888888x..x88888X.  `!   '*888*P'    .888B .   4888    '8888c. .+  '*88*' 8888'    "
+    @screen.output_line "   f  ^%888888% `*88888nx'      'Y'       ^*888%    '888     '88888%      ''   'Y'      "
+    @screen.output_line "        `'**'`    `'**''                    '%       88R       'YP'                     "
+    @screen.output_line "                                                     88>                                "
+    @screen.output_line "                                                     48                                 "
+    @screen.output_line "                                                     '8                                 "
+    @screen.output_line "    .....                                       s                          ....         "
+    @screen.output_line " .H8888888h.  ~-.                              :8      .x~~'*Weu.      .xH888888Hx.     "
+    @screen.output_line " 888888888888x  `>               uL   ..      .88     d8Nu.  9888c   .H8888888888888:   "
+    @screen.output_line "X~     `?888888hx~      .u     .@88b  @88R   :888ooo  88888  98888   888*'''?''*88888X  "
+    @screen.output_line "'      x8.^'*88*'    ud8888.  ''Y888k/'*P  -*8888888  '***'  9888%  'f     d8x.   ^%88k "
+    @screen.output_line " `-:- X8888x       :888'8888.    Y888L       8888          ..@8*'   '>    <88888X   '?8 "
+    @screen.output_line "      488888>      d888 '88%'     8888       8888       ````'8Weu    `:..:`888888>    8>"
+    @screen.output_line "    .. `'88*       8888.+'        `888N      8888      ..    ?8888L         `'*88     X "
+    @screen.output_line "  x88888nX'      . 8888L       .u./'888&    .8888Lu= :@88N   '8888N    .xHHhx..'      ! "
+    @screen.output_line " !'*8888888n..  :  '8888c. .+ d888' Y888*'  ^%888*   *8888~  '8888F   X88888888hx. ..!  "
+    @screen.output_line "'    '*88888888*    '88888%   ` 'Y   Y'       'Y'    '*8'`   9888%   !   '*888888888'   "
+    @screen.output_line "        ^'***'`       'YP'                             `~===*%'`            ^'***'`     "
   end
 
   # Calls the main ray casting engine, updates the screen buffer,
@@ -2503,7 +2708,7 @@ class Game
     clear_buffer
     ray_cast @player_x, @player_y, @player_angle
     populate_buffer
-    clear_screen
+    clear_screen false
     draw_buffer
     draw_status_line
   end
@@ -2529,6 +2734,11 @@ class Game
         @doors.delete door
       end
     end
+  end
+
+  def update_message( message )
+    @message_timer = Time.now
+    @display_message = message.ljust( 40 )
   end
 
   # Updates the state and position of any moving walls.

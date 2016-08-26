@@ -44,6 +44,8 @@ Documentation may be derived from the code using the popular YARD documentation 
 Features
 ========
 
+![Preview](preview.gif)
+
 Here are the features currently supported in Wolfentext:
 
 * Solid orthogonal walls
@@ -53,11 +55,11 @@ Here are the features currently supported in Wolfentext:
 * True, multi-directional pushwalls
 * Title, help, debug, and ending screens
 * 16 colors of super-pixelated eye candy!
-* 256-color wall textures (**NEW!**)
+* 256-color wall textures
+* Textured floors and ceilings (**NEW!**)
 
 ...and here are some **missing** features that are in the works:
 
-* Textured floors and ceilings
 * Stationary and usable objects
 * Enemies and other entities
 * Sounds or music
@@ -140,6 +142,8 @@ For the curious, here's a short summary table highlighting various milestones fr
 
 | Release | Notable features                                |
 |---------|-------------------------------------------------|
+| 0.9.0   | Ceiling and floor textures                      |
+|         | Add in-game system messages                     |
 | 0.8.0   | Wall textures                                   |
 | 0.7.0   | Multi-direction pushwalls                       |
 |         | Multi-direction moving walls                    |
