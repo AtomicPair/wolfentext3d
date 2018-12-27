@@ -27,14 +27,14 @@
        ^'***'`       'YP'                             `~===*%'`            ^'***'`
 ```
 
-"Kinda like the original. Now for your terminal window!"
+"Kinda like the original, but now for your terminal window!"
 
 Wolfentext3D is a simple take on a classic game with the following goals:
 
 * Lean and mean: all code should be contained in a single source file.
 * Cross-platform: it should work reasonably well across Linux, Mac, and yes, even Windows.
 * Instructive: the code should be clean, readable, and easy to follow.
-* No external dependencies, other than the Ruby core and standard libraries.
+* Stand-alone: No external dependencies, other than the Ruby core and standard libraries.
 * No bitmap graphics: everything uses ASCII art and terminal colors!
 
 Wolfentext is proudly (if not somewhat arbitrarily) written in pure Ruby.
@@ -48,23 +48,22 @@ Features
 
 Here are the features currently supported in Wolfentext:
 
-* Solid orthogonal walls
-* Recessed sliding doors
+* Solid, orthogonal walls
+* Recessed horizontal sliding doors
 * Solid floor and ceiling background
+* Textured floors and ceilings
 * Collision detection with wall sliding
-* True, multi-directional pushwalls
+* Multi-directional pushwalls and moving walls
 * Title, help, debug, and ending screens
-* 16 colors of super-pixelated eye candy!
-* 256-color wall textures
-* Textured floors and ceilings (**NEW!**)
+* Over 16 colors of pixelated eye candy!
 
-...and here are some **missing** features that are in the works:
+...and here are some **missing** features that are still in the works:
 
-* Stationary and usable objects
-* Enemies and other entities
-* Sounds or music
-* Resizeable viewport
-* OS and terminal type detection
+* [Stationary and usable objects](https://github.com/AtomicPair/wolfentext3d/issues/5)
+* [Enemies and other entities](https://github.com/AtomicPair/wolfentext3d/issues/4)
+* [Sounds and/or music](https://github.com/AtomicPair/wolfentext3d/issues/6)
+* [Resizeable viewport](https://github.com/AtomicPair/wolfentext3d/issues/7)
+* [Terminal type detection](https://github.com/AtomicPair/wolfentext3d/issues/8)
 
 Requirements
 ============
@@ -112,7 +111,7 @@ Wolfentext has been tested against the following terminals and platforms:
 | XTerm          | Ubuntu 14.04 |       45-60 fps |        0-15 fps   |
 | Z shell (zsh)  | Mac OS X     |       45-60 fps |       45-60 fps   |
 
-Although most modern terminal emulators seem capable of delivering playable frame rates, it goes without saying that users with integrated or low-end graphics cards may experienced decreased (and in some cases, unplayable) performance.  I have noticed this myself when testing various terminal emulators on my main system: a five-year-old HP Pavilion dv7 laptop with hybrid ATI graphics.  *Some terminals performed over 100-200% faster when using the discrete ATI graphics card instead of the integrated Intel 915 chipset.*
+Although most modern terminal emulators seem capable of delivering playable frame rates, it goes without saying that users with integrated or low-end graphics cards may experienced decreased (and in some cases, unplayable) performance.  I have noticed this myself when testing various terminal emulators on my main system: a 2010 HP Pavilion dv7 laptop with hybrid ATI graphics.  *Some terminals performed over 100-200% faster when using the discrete ATI graphics card instead of the integrated Intel 915 chipset.*
 
 **If you are experiencing degraded or unplayable performance with Wolfentext in your favorite terminal program,** try adjusting the graphics properties of your host system (including switching to a discrete graphics mode, if your system supports it).  Using the table above as a guide, you can also try running Wolfentext in another terminal emulator which may yield better performance.
 
@@ -123,7 +122,7 @@ Issues
 
 Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some known issues with the game of which you should be aware:
 
-* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, often achieving frame rates up to 60 fps.  However, some users may notice **significant** performance issues when using *any* color mode in their perferred terminal (see Compatibility section above).  Other third-party terminals may yield better performance but have not yet been tested.
+* *Graphics*: In order to maintain code readability and cross-platform compatibility, Wolfentext uses a simple, single-buffered, terminal-based graphics system. In non-color mode, this should work quite well across all platforms, often achieving frame rates up to 60 fps.  However, some users may notice **significant** performance issues when using *any* color mode in their preferred terminal (see Compatibility section above).  Other third-party terminals may yield better performance but have not yet been tested.
 
 * *Input*: The input logic only handles one keypress at a time.  Support for multiple keypresses is planned in a future release, assuming we can find a sensible cross-platform method that works.
 
@@ -131,7 +130,35 @@ Despite it's shimmering textiness, Wolfentext ain't perfect.  Here are some know
 
 * *Optimizations*: Although the script utilizes several optimizations in key areas, the code could still benefit from (1) further graphical optimizations for common, low-performing terminal configurations; (2) reducing and/or eliminating the amount of floating-point math used across game calculations and lookup tables (with additional benchmarking to prove which optimizations are the most beneficial); and (3) optimizing any other remaining areas of the core ray casting engine, which presently consumes most of the processing time for each game loop iteration.  Other areas of opportunity may also exist which have not yet been identified.
 
-Any thoughts or suggestions for solving these issues -- including pull requests -- are always welcome!
+Any suggestions for solving these issues are always welcome!  See the Contributing section below.
+
+Contributing
+============
+
+Pull requests that fix bugs or propose new functionality are always welcome, provided contributors keep the following conditions in mind:
+
+* Code contributions should be properly formatted and fully documented before final submissions are merged into master.  If I make formatting changes to your code or request that you make similar changes yourself, please don't take it personally: the goal is to maintain a simple but consistent style across the entire project that is both readable and maintainable by others in the future.  :-)
+
+* Before submitting new feature requests, it is recommended that you check the list of [open roadmap tickets](https://github.com/AtomicPair/wolfentext3d/labels/roadmap) to see if anyone else is already working on that feature.  This will help reduce the chance of duplicating efforts while allowing everyone to collaborate on the same feature more effectively.
+
+* All contributors whose pull requests are accepted will be given full credit for their ideas and/or submissions in the project README.
+
+* Since this project is officially ["unlicensed"](http://unlicense.org/) as public domain software, all contributors will need to agree to the following snippet and include it as a separate comment in their pull request before their contributions can be merged into the repository:
+
+```
+I dedicate any and all copyright interest in this software to the
+public domain. I make this dedication for the benefit of the public at
+large and to the detriment of my heirs and successors. I intend this
+dedication to be an overt act of relinquishment in perpetuity of all
+present and future rights to this software under copyright law.
+```
+
+If you have any questions about this process, please let me know!
+
+Support
+=======
+
+If you have any problems or suggestions, please let me know by [filing an issue](http://github.com/AtomicPair/wolfentext3d/issues/) in the tracker.
 
 History
 =======
@@ -142,6 +169,7 @@ For the curious, here's a short summary table highlighting various milestones fr
 
 | Release | Notable features                                |
 |---------|-------------------------------------------------|
+| 0.9.1   | Updated licensing and contributor information   |
 | 0.9.0   | Ceiling and floor textures                      |
 |         | In-game system messages                         |
 | 0.8.0   | Wall textures                                   |
@@ -154,7 +182,17 @@ For the curious, here's a short summary table highlighting various milestones fr
 | 0.2.0   | Improved graphic system with almost no flicker  |
 | 0.1.0   | Initial alpha release                           |
 
-Support
+License
 =======
 
-If you have any problems or suggestions, please file an issue in the official [GitHub repository](http://github.com/AtomicPair/wolfentext3d/issues/).
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this software, either in source code form or as a compiled binary, for any purpose, commercial or non-commercial, and by any means.
+
+In jurisdictions that recognize copyright laws, the author or authors of this software dedicate any and all copyright interest in the software to the public domain. We make this dedication for the benefit of the public at large and to the detriment of our heirs and successors. We intend this dedication to be an overt act of relinquishment in perpetuity of all present and future rights to this software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to [http://unlicense.org/](http://unlicense.org/).
+
+Written by Adam Parrott between 2016 and 2018.  All wrongs reversed.
